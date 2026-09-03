@@ -1,0 +1,16 @@
+# Manual version-history zips - superseded by git history itself
+*.zip
+
+# Saved HTML pages / their asset dumps (reference reading material, not source)
+*.html
+*_files/
+
+# Nested upstream clone - has its own .git, tracked separately if needed
+dota2bot-OpenHyperAI/
+
+# Ad-hoc local backups - superseded by git history
+backups/
+
+# Deployment mirrors of 3246316298/ (kept byte-identical via sync, not source of truth)
+OpenHyperAI-Enhanced/
+TI-Champions-Bot/

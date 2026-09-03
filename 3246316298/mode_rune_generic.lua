@@ -1,0 +1,144 @@
+local a={}local b=require(GetScriptDirectory()..'/FuncLib/func_utils')local c=require(GetScriptDirectory()..'/FuncLib/systems/custom_loader')local RunePolicy=require(GetScriptDirectory()..'/FuncLib/systems/rune_policy')local LaneDiscipline=require(GetScriptDirectory()..'/FuncLib/systems/lane_discipline')c.ThinkLess=c.Enable and c.ThinkLess or 1;
+local d=GetBot()local e=0;
+local f=0;
+local g=false;
+local h={RUNE_BOUNTY_1,RUNE_BOUNTY_2,RUNE_BOUNTY_3,RUNE_BOUNTY_4,RUNE_POWERUP_1,RUNE_POWERUP_2}local i,j,k,l,m,n;
+local o,p;
+function GetDesire()if ShouldSkipBotThink(GetBot())then return 0 end;
+return GetDesireRaw()end;
+function GetDesireRaw()a.InitRune();
+g=d:FindItemSlot('item_bottle')>=0;
+i=b.GetHP(d)j=b.GetMP(d)k=b.GetPosition(d)l=d:GetActiveMode()m=d:GetActiveModeDesire()n=d:GetAssignedLane()o=d:GetNearbyHeroes(1600,false,BOT_MODE_NONE)or{}p=d:GetNearbyHeroes(1600,true,BOT_MODE_NONE)or{}local forcedRune,forcedDistance=RunePolicy.FindSafeAvailableRune(d,900)if forcedRune~=nil then local forced=d.rune.normal;forced.location=forcedRune;forced.distance=forcedDistance;forced.status=GetRuneStatus(forcedRune);forced.type=GetRuneType(forcedRune)return BOT_MODE_DESIRE_ABSOLUTE end;if d:IsInvulnerable()and i>0.9 and d:DistanceFromFountain()<500 then return BOT_MODE_DESIRE_ABSOLUTE end;
+if DotaTime()>0 and#p>0 then if#p>#o then return BOT_MODE_DESIRE_NONE end;
+if d:WasRecentlyDamagedByAnyHero(2.0)and i<0.4 then return BOT_MODE_DESIRE_NONE end end;
+if b.Utils.IsTeamPushingSecondTierOrHighGround(d)then return BOT_MODE_DESIRE_NONE end;
+local x=b.Utils.CountEnemyHeroesNear(GetAncient(GetTeam()):GetLocation(),3200)if x>=1 then return BOT_MODE_DESIRE_NONE end;
+if b.Utils.CountEnemyHeroesOnHighGround(GetTeam())>=2 then return BOT_MODE_DESIRE_NONE end;
+if not b.IsInLaningPhase()then if b.IsPushing(d)or b.IsDefending(d)then return BOT_MODE_DESIRE_NONE end;
+local y=d:GetActiveMode()if y==BOT_MODE_PUSH_TOWER_TOP or y==BOT_MODE_PUSH_TOWER_MID or y==BOT_MODE_PUSH_TOWER_BOT then return BOT_MODE_DESIRE_NONE end end;
+if DotaTime()>=60 and DotaTime()<7*60 then local z=2500;
+if l==BOT_MODE_RUNE and d.rune and d.rune.normal and d.rune.normal.location~=nil and d.rune.normal.location~=-1 and GetUnitToLocationDistance(d,GetRuneSpawnLocation(d.rune.normal.location))<z then if RunePolicy.IsCollectible(d.rune.normal.location)then return BOT_MODE_DESIRE_VERYHIGH end end;
+local B=a.GetLaningRuneDesire(z)if B>0 then return B end end;
+if d.rune and d.rune.normal then local C=b.IsInLaningPhase()and 1600 or 1200;
+local D=d.rune.normal;
+D.location,D.distance=a.GetBestRune()if D.distance>4000 and DotaTime()>=60*2 then return BOT_MODE_DESIRE_NONE end;
+if DotaTime()<0 and not d:WasRecentlyDamagedByAnyHero(10.0)then local pregameRune=RunePolicy.GetPregameRune(d)if pregameRune~=nil then D.location=pregameRune;D.distance=GetUnitToLocationDistance(d,GetRuneSpawnLocation(pregameRune));D.status=GetRuneStatus(pregameRune);D.type=GetRuneType(pregameRune)return BOT_MODE_DESIRE_MODERATE end;return BOT_MODE_DESIRE_NONE end;
+if not b.IsInLaningPhase()and D.distance>2000 then return BOT_MODE_DESIRE_NONE end;
+if D.location~=-1 then D.type=GetRuneType(D.location)D.status=GetRuneStatus(D.location)local E=GetRuneSpawnLocation(D.location);
+if RunePolicy.IsBountyRune(D.location)then if RunePolicy.IsCollectible(D.location)and(a.IsTeamMustSaveRune(D.location)or not b.IsInLaningPhase()or GetUnitToLocationDistance(d,E)<=500)then if a.IsEnemyPickRune(D.location)and not RunePolicy.IsLocallySafe(d,E)then return BOT_MODE_DESIRE_NONE end;
+if g or k>=4 and not a.IsThereAllyWithBottle(E,1600)then return a.GetScaledDesire(BOT_MODE_DESIRE_VERYHIGH,D.distance,3500)else return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH,D.distance,3500)end end else if RunePolicy.IsCollectible(D.location)then if a.IsEnemyPickRune(D.location)and not RunePolicy.IsLocallySafe(d,E)then return BOT_MODE_DESIRE_NONE end;
+local H=D.type;
+if H==RUNE_WATER and(g or i<0.6 or j<0.5)then return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH,D.distance,3200)elseif H==RUNE_WATER and not g then return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH,D.distance,C)end;
+local I=n==LANE_MID and b.IsInLaningPhase()if g or not b.IsEarlyGame()and k<=3 then local J=I and BOT_MODE_DESIRE_VERYHIGH or BOT_MODE_DESIRE_HIGH;
+return a.GetScaledDesire(J,D.distance,C*2.5)else return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH,D.distance,C*2.5)end end end end;
+return BOT_MODE_DESIRE_NONE end end;
+local K=nil;
+function OnStart()local L=d:FindItemSlot('item_bottle')if d:GetItemSlotType(L)==ITEM_SLOT_TYPE_MAIN then K=d:GetItemInSlot(L)end end;
+function OnEnd()K=nil;if DotaTime()>=0 then LaneDiscipline.MarkReturnToLane(d,'rune_mode_end',14)end end;
+local M=-math.huge;
+function Think()if d:IsInvulnerable()and d:DistanceFromFountain()<500 then d:Action_MoveToLocation(d:GetLocation()+RandomVector(500))return end;
+if RunePolicy.TryImmediatePickup(d,325)then return end;if DotaTime()<(d._ohaRunePickupUntil or-90)then return end;if b.CanNotUseAction(d)then return end;
+if DotaTime()<0 then if b.IsModeTurbo()and DotaTime()<-50 then return end;
+local N=d:GetNearbyHeroes(1200,true,BOT_MODE_NONE)local O=d:GetNearbyHeroes(1200,false,BOT_MODE_NONE)if#N>#O and#N>=2 then local P=GetLaneFrontLocation(GetTeam(),n or d:GetAssignedLane(),-1500)d:Action_MoveToLocation(P)return end;
+if DotaTime()<-10 then local Q=a.GetGoOutLocation()if GetUnitToLocationDistance(d,Q)>300 then d:Action_MoveToLocation(Q)return else if DotaTime()>=M then d:Action_MoveToLocation(Q+RandomVector(150))M=DotaTime()+RandomFloat(1,3)return end end;
+return end;
+local pregameRune=RunePolicy.GetPregameRune(d)if pregameRune~=nil then d:Action_MoveToLocation(GetRuneSpawnLocation(pregameRune))return end;local lane=n or d:GetAssignedLane()or LANE_MID;d:Action_MoveToLocation(GetLaneFrontLocation(GetTeam(),lane,-1200))return end;
+if d.rune and d.rune.normal then local D=d.rune.normal;
+if D.location==nil or D.location==-1 then return end;
+local E=GetRuneSpawnLocation(D.location)local U=D.location==RUNE_POWERUP_1 or D.location==RUNE_POWERUP_2;
+D.distance=GetUnitToLocationDistance(d,E)D.status=GetRuneStatus(D.location)D.type=GetRuneType(D.location)d.rune.location=E;if not RunePolicy.IsCollectible(D.location)then D.location=-1;d._ohaRuneCommitRune=nil;d._ohaRuneCommitUntil=-90;LaneDiscipline.MarkReturnToLane(d,'rune_unavailable',16)return end;if not RunePolicy.IsDesignatedCollector(d,D.location)then D.location=-1;d._ohaRuneCommitRune=nil;d._ohaRuneCommitUntil=-90;LaneDiscipline.MarkReturnToLane(d,'rune_claim_lost',12)return end;
+if RunePolicy.IsCollectible(D.location)then if D.distance<=325 and RunePolicy.TryImmediatePickup(d,325)then return end;
+if K and b.CanCastAbility(K)and D.distance>=450 and D.distance<1200 and DotaTime()>(d._ohaLastBottleBeforeRune or-90)+1.5 then local V=K:GetCurrentCharges()if V>0 and(i~=1 or j~=1)then d._ohaLastBottleBeforeRune=DotaTime();d:Action_UseAbility(K)return end end;
+d:Action_MoveToLocation(E)return end;
+d:Action_MoveToLocation(E)return end end;
+function a.InitRune()if d.rune==nil then d.rune={normal={time=0,type=nil,location=nil,distance=0,status=RUNE_STATUS_MISSING},location=nil}end end;
+function a.IsSuitableToPickRune()if a.IsNearRune(d,550)then return true end;
+local E=GetRuneSpawnLocation(d.rune.normal.location)if b.IsRetreating(d)and m>BOT_MODE_DESIRE_HIGH or#p>=1 and#b.GetHeroesTargetingUnit(p,d)>0 or d:WasRecentlyDamagedByAnyHero(5.0)and b.IsRetreating(d)or GetUnitToUnitDistance(d,GetAncient(GetTeam()))<2500 and DotaTime()>0 or GetUnitToUnitDistance(d,GetAncient(GetOpposingTeam()))<4000 or d:HasModifier('modifier_item_shadow_amulet_fade')then return false end;
+return true end;
+function a.IsNearRune(X,Y)Y=Y or 600;
+for F,D in pairs(h)do local E=GetRuneSpawnLocation(D)if GetUnitToLocationDistance(X,E)<=Y then return true end end;
+return false end;
+function a.GetBestRune()e=math.floor(DotaTime()/60)f=DotaTime()%60;
+local Z=-1;
+local _=math.huge;
+-- Position-1 always outranks everyone for rune priority, which was dragging
+-- the hard carry across the map to river/mid power runes during laning just
+-- because it's the top-priority collector, with zero regard for how far
+-- that is from its own lane. Lane 1/3 cores now only consider runes within
+-- 2600 units of their own lane front while laning is active.
+local pos=b.GetPosition and b.GetPosition(d)
+local coreLeashed=(pos==1 or pos==3)and b.IsInLaningPhase()
+local laneFront=coreLeashed and GetLaneFrontLocation(GetTeam(),d:GetAssignedLane()or LANE_MID,0)
+for F,D in pairs(h)do local E=GetRuneSpawnLocation(D)if RunePolicy.IsCollectible(D)and a.IsTheClosestAlly(d,E)and RunePolicy.IsDesignatedCollector(d,D)and RunePolicy.IsLocallySafe(d,E)and(not coreLeashed or(laneFront-E):Length2D()<=2600)then if RunePolicy.IsBountyRune(D)or(b.IsCore(d)or not b.IsThereCoreNearby(1200))then local a0=GetUnitToLocationDistance(d,E)if a0<_ then Z=D;
+_=a0 end end end end;
+return Z,_ end;
+function a.IsTheClosestAlly(X,Q)local a1=X;
+local a2=GetUnitToLocationDistance(X,Q)for u=1,5 do local v=GetTeamMember(u)if b.IsValidHero(v)then local a3=GetUnitToLocationDistance(v,Q)if a3<a2 then a1=v;
+a2=a3 end end end;
+return a1==X end;
+function a.IsThereAllyWithBottle(Q,Y)for u=1,5 do local v=GetTeamMember(u)if b.IsValidHero(v)and v~=d and GetUnitToLocationDistance(v,Q)<=Y and v:FindItemSlot('item_bottle')>=0 then return true end end;
+return false end;
+function a.IsTherePosition(a4,a5,Y)local E=GetRuneSpawnLocation(a5)for u=1,5 do local v=GetTeamMember(u)if b.IsValidHero(v)and b.GetPosition(v)==a4 and d~=v then local a6=GetUnitToLocationDistance(d,E)local a7=GetUnitToLocationDistance(v,E)if a6<=Y and a7<=Y then return true end end end;
+return false end;
+local a8=30;
+function a.IsPingedByHumanPlayer(Q,Y)for u=1,5 do local v=GetTeamMember(u)if b.IsValidHero(v)and not v:IsBot()and GetUnitToLocationDistance(v,Q)<=Y then local w=v:GetMostRecentPing()if w then if not w.normal_ping and b.GetDistance(w.location,Q)<=800 and GameTime()-w.time<a8 then return true end end end end;
+return false end;
+function a.IsPowerRune(a5)local H=GetRuneType(a5)if H==RUNE_DOUBLEDAMAGE or H==RUNE_HASTE or H==RUNE_ILLUSION or H==RUNE_INVISIBILITY or H==RUNE_REGENERATION or H==RUNE_ARCANE or H==RUNE_SHIELD then return true end;
+return false end;
+function a.IsMissing(s)if f<52 and GetRuneStatus(s)==RUNE_STATUS_MISSING then return true end;
+return false end;
+function a.IsEnemyPickRune(s)local E=GetRuneSpawnLocation(s)if GetUnitToLocationDistance(d,E)<600 then return false end;
+for F,a9 in pairs(p)do if b.IsValidHero(a9)and not b.IsSuspiciousIllusion(a9)and(a9:IsFacingLocation(E,30)or GetUnitToLocationDistance(a9,E)<600)and GetUnitToLocationDistance(a9,E)<GetUnitToLocationDistance(d,E)+300 then return true end end;
+return false end;
+function a.IsUnitAroundLocation(aa,Y)for F,ab in pairs(GetTeamPlayers(GetOpposingTeam()))do if IsHeroAlive(ab)then local ac=GetHeroLastSeenInfo(ab)if ac~=nil then local ad=ac[1]if ad~=nil and b.GetDistance(aa,ad.location)<=Y and ad.time_since_seen<1.0 then return true end end end end;
+return false end;
+function a.GetScaledDesire(ae,af,ag)local ah=0.92;
+if af>2000 and(b.IsLateGame()or b.GetDistanceFromEnemyFountain(d)<5500)then ah=0.55 elseif af>1200 then ah=0.85 end;
+local ai=b.GetHP(d)local aj=Clamp(ae*RemapValClamped(af,0,ag,1,0.5),0,ah)if ai<0.6 then aj=RemapValClamped(ai,0,0.8,0,aj)end;
+return aj end;
+local ak=nil;
+function a.GetGoOutLocation()if ak then return ak end;
+if GetTeam()==TEAM_RADIANT then if k==1 or k==5 then local al={Vector(526.370239,-3893.405762,256.000000),Vector(1999.415894,-4838.790039,256.000000)}ak=al[RandomInt(1,#al)]elseif k==2 or k==3 or k==4 then local al={Vector(-3456.702637,649.725403,256.000000),Vector(-1945.830322,60.404663,128.000000)}ak=al[RandomInt(1,#al)]end elseif GetTeam()==TEAM_DIRE then if k==1 or k==5 then local al={Vector(-1051.021973,3384.059082,256.000000),Vector(-2415.422119,4641.448242,256.000000)}ak=al[RandomInt(1,#al)]elseif k==2 or k==3 or k==4 then local al={Vector(2734.819580,-1155.105225,256.000000),Vector(1142.979614,-337.891663,128.000000)}ak=al[RandomInt(1,#al)]end end;
+return ak end;
+function a.CouldBlink(Q)local am=d:FindItemSlot("item_blink")if d:GetItemSlotType(am)==ITEM_SLOT_TYPE_MAIN or(d:GetUnitName()=="npc_dota_hero_antimage"or d:GetUnitName()=="npc_dota_hero_queenofpain")then local an=d:GetItemInSlot(am)if d:GetUnitName()=="npc_dota_hero_antimage"then an=d:GetAbilityByName("antimage_blink")end;
+if d:GetUnitName()=="npc_dota_hero_queenofpain"then an=d:GetAbilityByName("queenofpain_blink")end;
+if b.CanCastAbility(an)then local ao=GetUnitToLocationDistance(d,Q)local ap=b.Site.GetXUnitsTowardsLocation(d,Q,1199)if ao<=500 then return false elseif ao<1200 then d:Action_UseAbilityOnLocation(an,Q)return true elseif IsLocationPassable(ap)then d:Action_UseAbilityOnLocation(an,ap)return true end end end;
+return false end;
+function a.IsTeamMustSaveRune(s)if RunePolicy.IsBountyRune(s)then return true end;if GetTeam()==TEAM_DIRE then return s==RUNE_POWERUP_2 or DotaTime()>1*60+45 and s==RUNE_POWERUP_1 else return s==RUNE_POWERUP_1 or DotaTime()>1*60+45 and s==RUNE_POWERUP_2 end end;
+function a.IsHumanDangerPingedRune(s)local t=GetRuneSpawnLocation(s)for u=1,#GetTeamPlayers(GetTeam())do local v=GetTeamMember(u)if v~=nil and v:IsAlive()and not v:IsBot()then local w=v:GetMostRecentPing()if w~=nil and not w.normal_ping and b.GetDistance(w.location,t)<=400 and GameTime()-w.time<30 then return true end end end;
+return false end;
+function a.IsAllyWithBottleCloser(s)local t=GetRuneSpawnLocation(s)local aq=GetUnitToLocationDistance(d,t)for u=1,#GetTeamPlayers(GetTeam())do local v=GetTeamMember(u)if v~=nil and v~=d and b.IsValidHero(v)and v:FindItemSlot('item_bottle')>=0 and GetUnitToLocationDistance(v,t)<aq then return true end end;
+return false end;
+function a.ShouldCheckRuneStatus(s)return RunePolicy.IsCollectible(s)end;
+function a.GetLaningRuneDesire(z)local as=math.floor(DotaTime()/60)local at=DotaTime()%60;
+-- Same lane-leash as GetBestRune: pos 1/3 cores shouldn't path across the
+-- map to a river power rune (or any distant rune) purely on priority rank.
+local coreLeashed=(k==1 or k==3)and b.IsInLaningPhase()
+local laneFront=coreLeashed and GetLaneFrontLocation(GetTeam(),d:GetAssignedLane()or LANE_MID,0)
+local au=DotaTime()<6*60 and(as%2==1 and at>=55 or as%2==0 and at<=5)if au then local av={RUNE_POWERUP_1,RUNE_POWERUP_2}local aw=nil;
+local ax=z;
+for F,D in pairs(av)do local ay=GetRuneStatus(D)local runeLoc=GetRuneSpawnLocation(D)if RunePolicy.IsCollectible(D)and not a.IsHumanDangerPingedRune(D)and RunePolicy.IsDesignatedCollector(d,D)and RunePolicy.IsLocallySafe(d,runeLoc)and(not coreLeashed or(laneFront-runeLoc):Length2D()<=2600)then local a0=GetUnitToLocationDistance(d,runeLoc)if a0<ax then aw=D;
+ax=a0 end end end;
+if aw~=nil then if d.rune and d.rune.normal then d.rune.normal.location=aw;
+d.rune.normal.distance=ax;
+d.rune.normal.status=GetRuneStatus(aw)d.rune.normal.type=GetRuneType(aw)end;
+return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH,ax,3200)end end;
+if k>=4 then local az=GetTeam()local aA=nil;
+if k==4 or k==5 then aA=RunePolicy.GetPregameRune(d)end;
+if aA~=nil and a.ShouldCheckRuneStatus(aA)and not a.IsHumanDangerPingedRune(aA)and RunePolicy.IsDesignatedCollector(d,aA)and RunePolicy.IsLocallySafe(d,GetRuneSpawnLocation(aA))then local a0=GetUnitToLocationDistance(d,GetRuneSpawnLocation(aA))if a0<z then if d.rune and d.rune.normal then d.rune.normal.location=aA;
+d.rune.normal.distance=a0;
+d.rune.normal.status=GetRuneStatus(aA)d.rune.normal.type=GetRuneType(aA)end;
+return a.GetScaledDesire(BOT_MODE_DESIRE_VERYHIGH,a0,3500)end end end;
+local aB=nil;
+local aC=z;
+local aD=RunePolicy.GetRunes()for F,D in pairs(aD)do local runeLoc=GetRuneSpawnLocation(D)if a.ShouldCheckRuneStatus(D)and not a.IsHumanDangerPingedRune(D)and RunePolicy.IsDesignatedCollector(d,D)and RunePolicy.IsLocallySafe(d,runeLoc)and(not coreLeashed or(laneFront-runeLoc):Length2D()<=2600)then local a0=GetUnitToLocationDistance(d,runeLoc)if a0<aC then aB=D;
+aC=a0 end end end;
+if aB~=nil then if d.rune and d.rune.normal then d.rune.normal.location=aB;
+d.rune.normal.distance=aC;
+d.rune.normal.status=GetRuneStatus(aB)d.rune.normal.type=GetRuneType(aB)end;
+return a.GetScaledDesire(BOT_MODE_DESIRE_HIGH,aC,z)end;
+return 0 end;
+if SafeCall then local aE=GetDesire;
+local aF=Think;
+if aE then GetDesire=SafeCall(aE,0,'RUNE_GetDesire')end;
+if aF then Think=SafeCall(aF,nil,'RUNE_Think')end end
