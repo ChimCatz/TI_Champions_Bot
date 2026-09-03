@@ -187,9 +187,14 @@ function X.TryImmediatePickup(bot, radius)
         if attempt ~= nil then
             local attemptLocation = GetRuneSpawnLocation(attempt.rune)
             local attemptDistance = GetUnitToLocationDistance(bot, attemptLocation)
+            -- A picked-up rune's type flips to invalid (-1) immediately, but
+            -- GetRuneStatus() can lag a tick behind and still report
+            -- AVAILABLE. Trusting status alone mislabeled successful
+            -- close-range pickups as aborted.
             local resolved = attempt.orders > 0
                 and attemptDistance <= 425
-                and GetRuneStatus(attempt.rune) ~= RUNE_STATUS_AVAILABLE
+                and (GetRuneStatus(attempt.rune) ~= RUNE_STATUS_AVAILABLE
+                    or (GetRuneType(attempt.rune) or -1) < 0)
             RuneLog(bot, resolved and 'PICKUP_RESOLVED' or 'PICKUP_ABORTED', attempt.rune, attemptDistance)
             LaneDiscipline.MarkReturnToLane(bot, resolved and 'rune_resolved' or 'rune_aborted', 16)
         end

@@ -75,8 +75,15 @@ function X.GetState()
     local numbersAdvantage = allyAlive >= 3
         and allyAlive >= enemyAlive + 2
         and majorityOnOwnSide
+    -- Neither baseSafe nor numbersAdvantage checked enemies already at the pit
+    -- itself, only map-wide alive count and ancient/high-ground proximity -
+    -- so both teams could independently "qualify" for Roshan (e.g. via a
+    -- human ping each) and walk into each other at even numbers. Require a
+    -- real local advantage over whoever is actually near Roshan right now.
+    local roshanEnemies = location ~= nil and #(J.GetEnemiesNearLoc(location, 2000) or {}) or 0
     local baseSafe = J.GetEnemiesAroundAncient(GetBot(), 3000) == 0
         and J.Utils.CountEnemyHeroesOnHighGround(GetTeam()) < 2
+        and (roshanEnemies == 0 or allyAlive >= roshanEnemies + 2)
     local damageReady = TeamHasEnoughRoshanDamage()
     local roshanUnlocked = DotaTime() >= MIN_ROSH_TIME
     if not roshanUnlocked then roshanCommitUntil = -math.huge end

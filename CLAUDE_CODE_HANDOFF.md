@@ -120,6 +120,74 @@ configuration at `Config_Version = 6` or increment all matching copies together.
 - Added backpack promotion for important usable items.
 - Rebranded logs/chat to TI Champions Bot and added `[TICB-*]` tags.
 
+### 0.6.5 - Lane lock, naming simplified per request, Roshan mutual-clash gap, rune mislabel (match 8980663786)
+
+- **Naming: abandoned slot/position matching entirely, per explicit request.**
+  0.6.4's `humanPositions` exclusion (based on `GetTeamPlayers`/`IsPlayerBot`
+  at call time) did not fix anything in this match - Radiant still showed
+  the same shifted-by-one pattern, and Dire fell back to pure Valve default
+  names (`Ольга`, `Alejandro`, ...) despite `bQ.Dire` being deployed and
+  valid. Root mechanism still unconfirmed (no error logged; most likely the
+  engine calls `GetBotNames()` at a point where slot/human presence isn't
+  yet reliably queryable). Per instruction, replaced with a much simpler,
+  dependency-free contract: shuffle each team's own roster (already
+  guaranteed distinct from the opposing team) and return it as-is, no
+  position correspondence attempted. Added a `[TICB-NAMES]` log line so the
+  next match shows definitively what each team's `GetBotNames()` actually
+  returns - if Dire *still* shows Valve defaults after this, the bug is
+  upstream of our Lua entirely (the engine not calling/honoring
+  `GetBotNames()` for that team at all).
+- **Forced lane commitment for cores (pos 1-3) - fixes both the Dire Pos 1
+  "never touched lane in 20 minutes" and Dire Pos 3 "undecisive in the
+  river" reports.** Root cause: `mode_farm_generic.lua` (base engine file)
+  picks farm locations via "closest neutral camp" with zero lane awareness,
+  and once actively camping returns `BOT_MODE_DESIRE_ABSOLUTE` (0.7) -
+  which outranks `lane_discipline.lua`'s existing return-to-lane desire
+  (`BOT_MODE_DESIRE_VERYHIGH`, 0.6) even though that mechanism was already
+  fully wired into `mode_laning_generic.lua`. Added
+  `DecisionPolicy.ShouldForceLaneCommitment(bot)`: for positions 1-3, while
+  `DotaTime() < 20:00` AND no Tier-3 tower has fallen anywhere on the map,
+  suppress farm desire outright whenever `LaneDiscipline.ShouldReturnToLane`
+  is true - letting laning mode's desire win and pull the core back via the
+  lane-return mechanism that already existed but was never able to act.
+- **Roshan mutual-clash gap found and fixed.** `objective_policy.lua`'s
+  `baseSafe`/`numbersAdvantage` only checked map-wide alive counts and
+  ancient/high-ground proximity - never whether enemies were already AT
+  Roshan's pit. Both teams could independently "qualify" (e.g. via a human
+  ping each satisfying the equal-numbers OR-branch) and walk into each
+  other. Added a real local-advantage requirement: `allyAlive >=
+  roshanEnemies + 2` where `roshanEnemies` counts enemies within 2000 units
+  of Roshan's current location specifically.
+- **Rune success rate still looked broken (1 resolved / 13 completed
+  attempts) even after 0.6.2's in-flight-continuation fix - found the real
+  cause.** Every `PICKUP_ABORTED` entry in this match's log showed
+  `type=-1` (rune slot empty - i.e. actually picked up) while
+  `GetRuneStatus` still lagged one tick behind reporting `AVAILABLE`. The
+  resolved/aborted classification in `rune_policy.lua` trusted status alone,
+  so real successful close-range pickups (71-233 unit distances) were
+  systematically mislabeled as failures. Now treats a negative `GetRuneType`
+  as resolution too.
+- Not done this round: item 4 from tonight's list (Medusa should fight more
+  while her ultimate is active/channeling) - no existing hero-specific
+  defensive-buff pattern exists anywhere in the codebase to extend safely,
+  and building one from scratch wasn't attempted this late in the session
+  rather than risk an untested hack. The "what I like, please refine" list
+  (support camp-clear speed, carry defensive/offensive item usage, support
+  auto-attack/deny discipline) and the "why I loved HyperAI before" wishlist
+  (mid roams for 3v2s, proactive tower-push interception, coordinated lane
+  pushes, desperate high-ground defense) are understood but out of scope for
+  tonight - each is a genuinely new behavior system, not a bug fix, and
+  would need its own dedicated session.
+- All five changed files (`rune_policy.lua`, `objective_policy.lua`,
+  `hero_selection.lua`, `decision_policy.lua`, `mode_farm_generic.lua`)
+  parse-checked clean and synced by SHA-256 to the Workshop deployment and
+  `TI-Champions-Bot/bots`.
+- Git housekeeping: root repo (`https://github.com/ChimCatz/TI_Champions_Bot`)
+  confirmed as the only git connection in the project tree -
+  `dota2bot-OpenHyperAI/`'s separate nested `.git` (pointing to a different
+  repo, `ChimCatz/dota2bot-OpenHyperAI`) was detached; its files are
+  untouched and still gitignored from the main repo as reference-only.
+
 ### 0.6.4 - Root-caused naming precisely, RNG diversity, mid-clash root cause (match 8980601360)
 
 - **Naming: found the exact mechanism, not just a plausible one.** Read the raw

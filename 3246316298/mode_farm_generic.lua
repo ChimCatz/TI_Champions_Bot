@@ -41,6 +41,7 @@ if ObjectivePolicy.ShouldCommitRoshan()then e._farmExitReason='roshan_commit'ret
 if LaneTactics.GetCombatIntent(e,e:GetAssignedLane())~=nil then e._farmExitReason='lane_combat'return BOT_MODE_DESIRE_NONE end;
 if LaneTactics.GetTaskIntent(e,e:GetAssignedLane())~=nil then e._farmExitReason='lane_support_task'return BOT_MODE_DESIRE_NONE end;
 if DecisionPolicy.ShouldSuppressEarlyMidFarm(e)then e._farmExitReason='mid_lane_duty'return BOT_MODE_DESIRE_NONE end;
+if DecisionPolicy.ShouldForceLaneCommitment(e)then e._farmExitReason='lane_lock'return BOT_MODE_DESIRE_NONE end;
 if DecisionPolicy.ShouldYieldLaneCreeps(e,1200)then e._farmExitReason='yield_farm_to_core'return BOT_MODE_DESIRE_NONE end;
 g.Utils['GameStates']=g.Utils['GameStates']or{}g.Utils['GameStates']['defendPings']=g.Utils['GameStates']['defendPings']or{pingedTime=GameTime()}if W>0.5 and GameTime()-g.Utils['GameStates']['defendPings'].pingedTime<=5.0 and(e._lastDefIgnoreChat or 0)+15<DotaTime()then e._lastDefIgnoreChat=DotaTime()local X=f.GetModeLocaleKey(e:GetActiveMode())local Y=c.Get(X)or X;
 local Z=c.Get('say_not_defending')if Z then e:ActionImmediate_Chat(string.format(Z,Y),false)end end;

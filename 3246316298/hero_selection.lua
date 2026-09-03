@@ -8,16 +8,23 @@ elseif false and bv=="!pos"and GetGameState()==GAME_STATE_PRE_GAME then
 elseif false and bv:match("^!(%d+)pos$")~=nil and GetGameState()==GAME_STATE_PRE_GAME then
  local bE,bF=bh:match("^!(%d+)pos (%d+)$")if bE and bF then log("Swap position for #%s to play pos %s",bE,bF)else log("Invalid command format for swapping pos")return end;local by=GetTeamForPlayer(bi)==TEAM_RADIANT and'TEAM_RADIANT'or'TEAM_DIRE'local bz=aH[by]if j.HasValue(bz,bF)then local aA=tonumber(bF)local bA=bi+1;for bB,al in pairs(a3)do if bB==tonumber(bE)then bA=bB end end;for aB,al in pairs(a3)do if i.RoleAssignment[by][aB]==aA then i.RoleAssignment[by][bA],i.RoleAssignment[by][aB]=aA,i.RoleAssignment[by][bA]if GetTeamForPlayer(bi)==TEAM_DIRE then local bC=x[bA]or bA;local bD=x[aB]or aB;f[by][bC],f[by][bD]=f[by][bD],f[by][bC]else f[by][bA],f[by][aB]=f[by][aB],f[by][bA]end;log('Switch role ok. Team: %s PID: %s, idx: %s, new role: %s',by,bi,bA,i.RoleAssignment[by][bA])log('Switch role ok. Team: %s PID: %s, idx: %s, new role: %s',by,al,aB,i.RoleAssignment[by][aB])break end end else log("Cannot select pos: %s (not available).",bF)end elseif bv=="!sp"or bv=="!speak"then HandleLocaleSetting(bw)else log("Unknown action: %s, command text: %s",bv,bh)end end end;function HandleLocaleSetting(bG)p.Localization=bG;log("Set to speak: %s",bG)end;local function bH()if b.initialized then return end;if GameTime()<3.0 and not g or a.IsHumanNotReady(GetTeam())or a.IsHumanNotReady(GetOpposingTeam())then return end;local aj=GameTime()+3;local bI=GetTeam()*3;local bJ,bK=1,3;local a3=GetTeamPlayers(GetTeam(),true)for bL=1,#a3 do local bM=RandomFloat(bJ,bK)b.NextPickAt[bL]=aj+(bL-1)*bI+bM end;b.initialized=true end;function Think()if GetGameMode()==GAMEMODE_CM or GetGameMode()==GAMEMODE_REVERSE_CM then l.CaptainModeLogic(u)l.AddToList()elseif GetGameMode()==GAMEMODE_1V1MID then OneVsOneLogic()else if GameTime()<3.0 and not g or a.IsHumanNotReady(GetTeam())or a.IsHumanNotReady(GetOpposingTeam())then if GetGameMode()~=GAMEMODE_TURBO then return end end;bH()if not b.initialized then return end;b7()end end;function GetHumanChatHero(I)if I==nil then return""end;I=I:lower()for G,U in pairs(u)do if o['en'][U]:lower()==I then log('Found hero %s for %s',U,I)return U end end;for G,U in pairs(u)do if string.find(U,I)then log('Found hero %s for %s',U,I)return U end end;log('Hero not supported with name: %s',I)return""end;function SelectHeroChatCallback(bi,bN,bj)local bO=string.lower(bN)if GetGameState()==GAME_STATE_HERO_SELECTION and string.len(bN)==2 then if m.Supported(bN)then HandleLocaleSetting(bN)end end;if b9(bO)then bg(bO,bi,bj)end end;local bP={Radiant={},Dire={}}if p then for Z=1,#p.Radiant_Names do if p.Radiant_Names[Z]~=nil then bP.Radiant[Z]=j.TrimString(p.Radiant_Names[Z])end end;for Z=1,#p.Dire_Names do if p.Dire_Names[Z]~=nil then bP.Dire[Z]=j.TrimString(p.Dire_Names[Z])end end end;local bQ=k.generateTeams(bP)
 function GetBotNames()
+-- Slot/position matching kept breaking (engine assigns names sequentially to
+-- bot player-IDs with no position awareness, and the timing of when a
+-- human's slot is queryable proved unreliable). Per explicit request: stop
+-- trying to align names to positions - just shuffle this team's own roster
+-- (already guaranteed distinct from the other team, see team_names.lua) so
+-- every name is used at most once and the assignment order is randomized.
 local positional=GetTeam()==TEAM_RADIANT and bQ.Radiant or bQ.Dire
-local humanPositions={}
-for Z,playerID in ipairs(GetTeamPlayers(GetTeam())or{})do
-if not IsPlayerBot(playerID)then local position=i.RoleAssignment[B]and i.RoleAssignment[B][Z];if position then humanPositions[position]=true end end
+local shuffled={}
+for idx=1,#positional do shuffled[idx]=positional[idx]end
+for idx=#shuffled,2,-1 do
+local swap=idx;
+local ok=pcall(function()swap=math.random(1,idx)end)
+if not ok then swap=RandomInt(1,idx)end
+shuffled[idx],shuffled[swap]=shuffled[swap],shuffled[idx]
 end
-local names={}
-for position=1,5 do
-if not humanPositions[position]then names[#names+1]=positional[position]end
-end
-return#names>0 and names or positional
+pcall(function()print(string.format('[TICB-NAMES] team=%s names=%s',GetTeam()==TEAM_RADIANT and'Radiant'or'Dire',table.concat(shuffled,',')))end)
+return shuffled
 end;
 local bR=false;
 function UpdateLaneAssignments()

@@ -2,6 +2,7 @@ local J = require(GetScriptDirectory() .. '/FuncLib/func_utils')
 local CreepPolicy = require(GetScriptDirectory() .. '/FuncLib/systems/creep_policy')
 local EconomyPhase = require(GetScriptDirectory() .. '/FuncLib/systems/economy_phase')
 local Diagnostics = require(GetScriptDirectory() .. '/FuncLib/systems/decision_log')
+local LaneDiscipline = require(GetScriptDirectory() .. '/FuncLib/systems/lane_discipline')
 
 local X = {}
 
@@ -10,6 +11,33 @@ local MID_LANE_DUTY_END = EconomyPhase.END_TIME
 local MID_UNSAFE_HOLD = 8
 local HUMAN_ASSIST_MAX_DISTANCE = 6500
 local HUMAN_ASSIST_RADIUS = 1500
+local LANE_LOCK_END_TIME = 20 * 60
+local TIER3_TOWERS = { TOWER_TOP_3, TOWER_MID_3, TOWER_BOT_3 }
+
+-- mode_farm_generic.lua's base jungle-camp selection has zero lane
+-- awareness (it just picks the closest neutral camp), which is what let
+-- cores drift to river/mid camps and never return to lane for 20+ minutes.
+-- lane_discipline.lua's return-to-lane push already exists and is wired
+-- into mode_laning_generic.lua, but farm mode's ABSOLUTE desire when
+-- actively camping outranks laning's VERYHIGH return-to-lane desire, so it
+-- never got a chance to act. Suppressing farm desire outright while this is
+-- true lets laning mode's desire win instead.
+local function IsAnyTier3TowerDown()
+    for _, team in ipairs({ TEAM_RADIANT, TEAM_DIRE }) do
+        for _, towerId in ipairs(TIER3_TOWERS) do
+            local tower = GetTower(team, towerId)
+            if tower == nil or not tower:IsAlive() then return true end
+        end
+    end
+    return false
+end
+
+function X.ShouldForceLaneCommitment(bot)
+    local position = J.GetPosition(bot)
+    if position == nil or position > 3 then return false end
+    if DotaTime() >= LANE_LOCK_END_TIME or IsAnyTier3TowerDown() then return false end
+    return LaneDiscipline.ShouldReturnToLane(bot)
+end
 
 local function IsHealthyResponder(unit)
     return J.IsValidHero(unit)
