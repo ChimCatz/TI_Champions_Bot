@@ -58,6 +58,32 @@ end
 local heartbeatLast = {}
 local HEARTBEAT_INTERVAL = 10
 
+-- BOT_MODE_* are engine globals whose numeric values aren't documented
+-- anywhere in this codebase and have shifted across Dota versions as Valve
+-- added modes (Outpost, etc.) - a bare mode number in a log is not reliably
+-- identifiable later. Resolve against the live constants instead of a
+-- hardcoded table so this is always correct for whatever version is running.
+local modeConstantNames = {
+    'BOT_MODE_NONE', 'BOT_MODE_LANING', 'BOT_MODE_ATTACK', 'BOT_MODE_FARM',
+    'BOT_MODE_PUSH_TOWER_TOP', 'BOT_MODE_PUSH_TOWER_MID', 'BOT_MODE_PUSH_TOWER_BOT',
+    'BOT_MODE_DEFEND_TOWER_TOP', 'BOT_MODE_DEFEND_TOWER_MID', 'BOT_MODE_DEFEND_TOWER_BOT',
+    'BOT_MODE_ASSEMBLE', 'BOT_MODE_TEAM_ROAM', 'BOT_MODE_ROSHAN', 'BOT_MODE_SECRET_SHOP',
+    'BOT_MODE_RUNE', 'BOT_MODE_RETREAT', 'BOT_MODE_ITEM', 'BOT_MODE_WARD',
+    'BOT_MODE_ASSEMBLE_WITH_HUMANS', 'BOT_MODE_DEFEND_ALLY', 'BOT_MODE_EVASIVE_MANEUVERS',
+    'BOT_MODE_ROAM', 'BOT_MODE_LOTS_OF_DEATHS', 'BOT_MODE_OUTPOST',
+}
+local modeNameByValue = nil
+local function ModeName(mode)
+    if modeNameByValue == nil then
+        modeNameByValue = {}
+        for _, name in ipairs(modeConstantNames) do
+            local ok, value = pcall(function() return _G[name] end)
+            if ok and value ~= nil then modeNameByValue[value] = name:gsub('^BOT_MODE_', '') end
+        end
+    end
+    return modeNameByValue[mode] or tostring(mode)
+end
+
 -- Unconditional periodic snapshot (every 10s per bot, independent of the
 -- LANE_STATE/LANE_RECOVERY throttle above) so a full match has a
 -- position/status trail even for bots that never trigger another category -
@@ -79,7 +105,7 @@ function X.Heartbeat(bot)
         okMp and string.format('%.0f', mpPct) or '?',
         tostring(okLvl and level or '?'),
         tostring(okGold and gold or '?'),
-        tostring(okMode and mode or '?'),
+        okMode and ModeName(mode) or '?',
         tostring(bot._farmExitReason or '-')))
 end
 

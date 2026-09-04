@@ -15,15 +15,25 @@ function GetBotNames()
 -- (already guaranteed distinct from the other team, see team_names.lua) so
 -- every name is used at most once and the assignment order is randomized.
 local positional=GetTeam()==TEAM_RADIANT and bQ.Radiant or bQ.Dire
+-- team_names.lua pads this array out to X.maxTeamSize (12) by reusing each
+-- of the 5 real roster identities with a numeric suffix (index 6 is
+-- identity 1 + ".6", index 11 is identity 1 + ".11", etc. - meant for LAN
+-- lobbies with substitutes, not a normal 5-a-side bot team). Shuffling and
+-- returning the FULL 12-length array let a 5-bot team draw both e.g.
+-- "Larl" and "Larl.12" for two different bots - two different strings, but
+-- the same visible identity twice, which reads as a broken/duplicate name.
+-- Only the first 5 (one per position, all genuinely distinct identities)
+-- should ever be in play for a 5-bot team.
 local shuffled={}
-for idx=1,#positional do shuffled[idx]=positional[idx]end
-for idx=#shuffled,2,-1 do
+local count=math.min(5,#positional)
+for idx=1,count do shuffled[idx]=positional[idx]end
+for idx=count,2,-1 do
 local swap=idx;
 local ok=pcall(function()swap=math.random(1,idx)end)
 if not ok then swap=RandomInt(1,idx)end
 shuffled[idx],shuffled[swap]=shuffled[swap],shuffled[idx]
 end
-pcall(function()print(string.format('[TICB-NAMES] team=%s names=%s',GetTeam()==TEAM_RADIANT and'Radiant'or'Dire',table.concat(shuffled,',')))end)
+pcall(function()log('[TICB-NAMES] team=%s names=%s',GetTeam()==TEAM_RADIANT and'Radiant'or'Dire',table.concat(shuffled,','))end)
 return shuffled
 end;
 local bR=false;

@@ -120,6 +120,63 @@ configuration at `Config_Version = 6` or increment all matching copies together.
 - Added backpack promotion for important usable items.
 - Rebranded logs/chat to TI Champions Bot and added `[TICB-*]` tags.
 
+### 0.6.9 - Rune-chase river-drift root cause (3rd site), name-pool dupes, sell-from-anywhere fix (match 8982243476)
+
+Match ended 3:40, human Dire Pos 2/3 Doom. Reported: Radiant Pos 1 Monkey King
+and Pos 2 Nevermore still oscillating/idling near the river; Radiant Pos 1
+had no name; concern that inventory space is stopping cores from finishing
+item builds.
+
+- **Root cause of the continuing river drift**: `mode_rune_generic.lua`'s
+  `coreLeashed` check (added in 0.6.4 to stop pos 1/3 chasing distant runes)
+  used `b.IsInLaningPhase()` - the exact same flag identified as fragile in
+  0.6.7 (only set by `mode_laning_generic.lua`, stuck false for the whole
+  pre-horn `DotaTime()<0` window and also false during recognized `laning
+  mode` early-outs like enemies-near-ancient or push situations). With
+  `coreLeashed=false`, pos 1/3 were free to chase ANY closest safe rune
+  map-wide - including the pregame power rune at the river - with no
+  distance limit. This is the third place this same flag has caused a
+  "supposedly restricted, actually silently unrestricted" bug (0.6.7 was
+  the secret shop; this is rune-chasing). Fixed both `GetBestRune()` and
+  `GetLaningRuneDesire()` to use `DecisionPolicy.IsLaneLockActive()` instead
+  (flag-independent, matches the shared 20:00/pre-T3 lock window).
+- Confirmed via heartbeat log that pos 1/2/3 all shared active mode 17
+  during the stall and converge on nearly identical coordinates - consistent
+  with several of them independently qualifying for the same unleashed rune
+  pursuit. Could not conclusively name mode 17 from memory (Valve has added
+  modes like Outpost over time, shifting the classic enum), so added a
+  `ModeName()` resolver to `decision_log.lua`'s heartbeat that reads the
+  live `BOT_MODE_*` globals at runtime instead of a hardcoded/guessed table -
+  future logs will name the mode directly instead of a bare number.
+- **Bot naming**: `[TICB-NAMES]` was silently never appearing in any log
+  because it used `print(...)` instead of this codebase's `log(...)`
+  convention - fixed. Also found and fixed a real defect in
+  `hero_selection.lua`'s `GetBotNames()`: it shuffled and returned the FULL
+  12-entry array `team_names.lua` builds (5 real roster identities padded
+  out to 12 slots for LAN-substitute support, e.g. index 12 is identity #2
+  + ".12"), so a normal 5-bot team's draw could land both an identity and
+  its padded-suffix duplicate (e.g. "Larl" and "Larl.12" on two different
+  bots) - looks like a broken/duplicate name even though the strings
+  technically differ. Now only shuffles/uses the first 5 (one per position,
+  all genuinely distinct). Root cause of the specific "Monkey King has no
+  name" report couldn't be confirmed from this log (no evidence of an empty
+  string reaching the engine) - the `[TICB-NAMES]` fix means the next
+  occurrence will be traceable.
+- **Item/inventory space**: found a genuine bug, worsened by our own
+  lane-lock changes. `item_purchase_generic.lua`'s full-inventory
+  make-room-for-purchase sell logic required being within 200 units of the
+  fountain or secret shop to fire - but selling doesn't require shop
+  proximity in Dota 2 (unlike buying), and other unconditioned
+  `ActionImmediate_SellItem` calls elsewhere in the same file confirm this.
+  With Pos 1-3 now locked in lane until 20:00 (0.6.6/0.6.7), a core with a
+  full inventory had no way to clear space for its next purchase until
+  returning to base - directly causing "items not finishing due to space."
+  Removed the proximity requirement from that gate; left the separate
+  paired-item/outdated-boots cleanup gate (a lower-priority tidying pass)
+  proximity-gated as before.
+- Validated: `luac -p` individually and full-workspace loop, both clean.
+  Deployed via SHA-256-verified copy to Workshop folder and release folder.
+
 ### 0.6.8 - Secret-shop hero-walk now defers to courier auto-dispatch
 
 Follow-up to 0.6.7, prompted by the user asking "why not just use the

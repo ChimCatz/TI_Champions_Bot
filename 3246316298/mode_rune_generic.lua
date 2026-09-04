@@ -1,4 +1,4 @@
-local a={}local b=require(GetScriptDirectory()..'/FuncLib/func_utils')local c=require(GetScriptDirectory()..'/FuncLib/systems/custom_loader')local RunePolicy=require(GetScriptDirectory()..'/FuncLib/systems/rune_policy')local LaneDiscipline=require(GetScriptDirectory()..'/FuncLib/systems/lane_discipline')c.ThinkLess=c.Enable and c.ThinkLess or 1;
+local a={}local b=require(GetScriptDirectory()..'/FuncLib/func_utils')local c=require(GetScriptDirectory()..'/FuncLib/systems/custom_loader')local RunePolicy=require(GetScriptDirectory()..'/FuncLib/systems/rune_policy')local LaneDiscipline=require(GetScriptDirectory()..'/FuncLib/systems/lane_discipline')local DecisionPolicy=require(GetScriptDirectory()..'/FuncLib/systems/decision_policy')c.ThinkLess=c.Enable and c.ThinkLess or 1;
 local d=GetBot()local e=0;
 local f=0;
 local g=false;
@@ -67,7 +67,13 @@ local _=math.huge;
 -- that is from its own lane. Lane 1/3 cores now only consider runes within
 -- 2600 units of their own lane front while laning is active.
 local pos=b.GetPosition and b.GetPosition(d)
-local coreLeashed=(pos==1 or pos==3)and b.IsInLaningPhase()
+-- b.IsInLaningPhase() reads bot.isInLanePhase, a flag only
+-- mode_laning_generic.lua sets and which stays false for the entire
+-- pre-horn DotaTime<0 window (see 0.6.7) - that let pos 1/3 chase any
+-- unleashed rune, pregame power rune included, straight to the river the
+-- instant the game started. DecisionPolicy.IsLaneLockActive() covers the
+-- same "must stay near lane" window without depending on that flag.
+local coreLeashed=(pos==1 or pos==3)and DecisionPolicy.IsLaneLockActive()
 local laneFront=coreLeashed and GetLaneFrontLocation(GetTeam(),d:GetAssignedLane()or LANE_MID,0)
 for F,D in pairs(h)do local E=GetRuneSpawnLocation(D)if RunePolicy.IsCollectible(D)and a.IsTheClosestAlly(d,E)and RunePolicy.IsDesignatedCollector(d,D)and RunePolicy.IsLocallySafe(d,E)and(not coreLeashed or(laneFront-E):Length2D()<=2600)then if RunePolicy.IsBountyRune(D)or(b.IsCore(d)or not b.IsThereCoreNearby(1200))then local a0=GetUnitToLocationDistance(d,E)if a0<_ then Z=D;
 _=a0 end end end end;
@@ -111,9 +117,9 @@ function a.IsAllyWithBottleCloser(s)local t=GetRuneSpawnLocation(s)local aq=GetU
 return false end;
 function a.ShouldCheckRuneStatus(s)return RunePolicy.IsCollectible(s)end;
 function a.GetLaningRuneDesire(z)local as=math.floor(DotaTime()/60)local at=DotaTime()%60;
--- Same lane-leash as GetBestRune: pos 1/3 cores shouldn't path across the
--- map to a river power rune (or any distant rune) purely on priority rank.
-local coreLeashed=(k==1 or k==3)and b.IsInLaningPhase()
+-- Same lane-leash as GetBestRune, same fix: b.IsInLaningPhase() is false
+-- for the whole pre-horn window, so use the flag-independent lock instead.
+local coreLeashed=(k==1 or k==3)and DecisionPolicy.IsLaneLockActive()
 local laneFront=coreLeashed and GetLaneFrontLocation(GetTeam(),d:GetAssignedLane()or LANE_MID,0)
 local au=DotaTime()<6*60 and(as%2==1 and at>=55 or as%2==0 and at<=5)if au then local av={RUNE_POWERUP_1,RUNE_POWERUP_2}local aw=nil;
 local ax=z;
