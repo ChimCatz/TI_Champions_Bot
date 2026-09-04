@@ -44,9 +44,30 @@ function X.IsLaneLocked(bot)
     return position ~= nil and position <= 3 and X.IsLaneLockActive()
 end
 
+local LANE_COMMIT_HOLD_SECONDS = 18
+
+-- LaneDiscipline.ShouldReturnToLane can flip true/false tick to tick right
+-- around its distance threshold, which - combined with farm mode re-earning
+-- an ABSOLUTE camp desire the instant this drops false - produced visible
+-- LANING/FARM mode-thrashing every ~10s for a locked core sitting near that
+-- boundary. Once a return-to-lane commitment starts, hold it for a minimum
+-- duration even if the underlying check briefly flips back, instead of
+-- re-litigating every tick.
 function X.ShouldForceLaneCommitment(bot)
-    if not X.IsLaneLocked(bot) then return false end
-    return LaneDiscipline.ShouldReturnToLane(bot)
+    if not X.IsLaneLocked(bot) then
+        bot._ohaLaneCommitUntil = nil
+        return false
+    end
+    local now = DotaTime()
+    if LaneDiscipline.ShouldReturnToLane(bot) then
+        bot._ohaLaneCommitUntil = now + LANE_COMMIT_HOLD_SECONDS
+        return true
+    end
+    if bot._ohaLaneCommitUntil ~= nil and now < bot._ohaLaneCommitUntil then
+        return true
+    end
+    bot._ohaLaneCommitUntil = nil
+    return false
 end
 
 local BASE_DEFEND_ANCIENT_RADIUS = 4000

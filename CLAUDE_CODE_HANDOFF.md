@@ -120,6 +120,62 @@ configuration at `Config_Version = 6` or increment all matching copies together.
 - Added backpack promotion for important usable items.
 - Rebranded logs/chat to TI Champions Bot and added `[TICB-*]` tags.
 
+### 0.7.0 - Position-label mismatch fixed (root cause of Jakiro-as-Pos-1 and likely much of the river-attitude reports), lane-commitment hysteresis (match 8982296896)
+
+Match reported: naming confirmed fixed by the user's own observation; Radiant
+Pos 1 Anti-Mage drifted/thrashed starting ~4:00 despite good early laning;
+Dire's Jakiro was labeled Pos 1 despite being a support hero.
+
+- **Root cause found: `role.lua`'s `GetPosition()` and `hero_selection.lua`'s
+  picking loop use two different player-enumeration calls that can disagree
+  on order.** Picking correctly draws each hero from a position-weighted
+  pool (`hero_pos_weights.lua`; Jakiro's weight for Pos 1 is a flat `0` -
+  mathematically impossible to draw for that slot, so it was picked
+  correctly, almost certainly for Pos 4/5). But the position *label* shown
+  everywhere else (`TICB-ITEM`, lane-lock, `IsCore`, every hero-specific
+  script) comes from a completely separate function that re-derives it by
+  scanning `GetTeamPlayers(team)` (no sort arg) and using the scan index
+  into a fixed `{1,2,3,4,5,...}` table - while picking itself enumerated
+  players via `GetTeamPlayers(team, true)`. When those two enumerations
+  don't agree, the hero drafted for one role gets labeled with another
+  team's-list-index-based one. This is the same class of "engine assigns
+  sequentially with no role awareness" issue that caused the 0.6.4/0.6.5
+  naming bugs, except for gameplay *positions* this time - which is far
+  more consequential, since every lane-lock/farm-focus/harass-balance fix
+  from 0.6.6 onward is built directly on `GetPosition()`. A support hero
+  mislabeled as Pos 1 gets held to the hard-carry farm-priority/lane-lock
+  rules, while whichever hero should have been Pos 1 may get mislabeled a
+  support and left free to roam - a strong candidate explanation for
+  "good for the first few minutes, then falls apart."
+  - Fix (per explicit request: label should match what the hero was
+    actually picked for): `hero_selection.lua`'s `b7()` now records
+    `i.PickedPosition[playerId] = Z` at the exact moment a bot's hero is
+    selected from pool `Z`, using the authoritative pick-time index instead
+    of ever re-deriving it later.
+  - `role.lua`'s `GetPosition()` had an existing same-purpose cache
+    (`a.HeroPositions`), but it's a memo of the buggy scan's *own* answer,
+    and gets wiped whenever `GetAssignedLane()` changes for that bot - which
+    would have silently reintroduced the mismatch mid-game even after a
+    correct pick, matching the "fine at first, breaks around minute 4"
+    timing. Added a second, never-cleared table (`a.PickedPosition`) that
+    `GetPosition()` now checks first, before falling back to the scan -
+    immune to that wipe.
+- **Lane-commitment hysteresis**: `LaneDiscipline.ShouldReturnToLane` can
+  flip true/false tick-to-tick right around its distance threshold, and
+  since farm mode re-earns an `ABSOLUTE` camp desire the instant it drops
+  false, a locked core sitting near that boundary visibly thrashed between
+  LANING and FARM (and by extension ATTACK/RETREAT) every ~10s - read as
+  "undecisive." `DecisionPolicy.ShouldForceLaneCommitment` now holds a
+  return-to-lane commitment for a minimum 18s once triggered, instead of
+  re-evaluating every tick.
+- Validated: `luac -p` individually and full-workspace loop, both clean.
+  Deployed via SHA-256-verified copy to Workshop folder and release folder.
+- Not yet re-verified in a live match - this is the biggest-blast-radius
+  change of the session (touches the function nearly everything else reads
+  position from), so the next match's `TICB-ITEM` lines are the thing to
+  check first: hero-role fit should look sane for every position, on both
+  teams, all game.
+
 ### 0.6.9 - Rune-chase river-drift root cause (3rd site), name-pool dupes, sell-from-anywhere fix (match 8982243476)
 
 Match ended 3:40, human Dire Pos 2/3 Doom. Reported: Radiant Pos 1 Monkey King
