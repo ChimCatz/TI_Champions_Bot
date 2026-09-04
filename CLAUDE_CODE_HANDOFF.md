@@ -120,6 +120,33 @@ configuration at `Config_Version = 6` or increment all matching copies together.
 - Added backpack promotion for important usable items.
 - Rebranded logs/chat to TI Champions Bot and added `[TICB-*]` tags.
 
+### 0.6.8 - Secret-shop hero-walk now defers to courier auto-dispatch
+
+Follow-up to 0.6.7, prompted by the user asking "why not just use the
+courier?" - correct instinct. `ability_item_usage_generic.lua` already has
+an automatic courier dispatch (`COURIER_ACTION_SECRET_SHOP`) that sends the
+courier to buy the moment `bot.SecretShop` turns true, with its own
+2.3s-cooldown/no-enemy-near-shop safety checks, and is flatly blocked before
+`DotaTime()<-56` (most of the pregame draft window). `mode_secret_shop_generic.lua`
+(the mode that walks the *hero* there) only deferred to it if the courier
+was `COURIER_STATE_MOVING` *at that exact instant* - so in the gap between
+`bot.SecretShop` flipping true and the courier actually taking off, the hero
+mode raced ahead uncontested and pulled the hero itself, defeating the whole
+point of having a courier fetch it. This was a general redundancy affecting
+every hero all game, not just Pos 1-3 pregame.
+
+- Added `bot._ohaSecretShopPendingSince` tracking and a 30-second courier
+  grace period: the hero-walk branch (aside from the courier-is-dead
+  fallback, which fires immediately as before) now only activates if the
+  courier hasn't managed to start moving within 30s of the item becoming
+  purchasable - a real fallback for a stuck/busy courier, not a race.
+- 0.6.7's `DecisionPolicy.IsLaneLocked` gate on this same mode stays in
+  place as a hard backstop specifically for Pos 1-3 during the lane-lock
+  window, so even in a courier-dead edge case cores still won't leave lane
+  before 20:00/a fallen T3.
+- Validated: `luac -p` clean. Deployed via SHA-256-verified copy to Workshop
+  folder and release folder.
+
 ### 0.6.7 - Secret-shop pregame drift fixed, Pos 1-3 harass rebalanced, supports tuned more aggressive (match 8982169848)
 
 Root cause found via heartbeat log: Radiant Pos 1 Alchemist (and matching

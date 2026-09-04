@@ -58,9 +58,28 @@ function GetDesireHelper()
         return BOT_MODE_DESIRE_NONE
     end
 
+    -- ability_item_usage_generic.lua already auto-dispatches the courier
+    -- (COURIER_ACTION_SECRET_SHOP) the moment bot.SecretShop turns true, but
+    -- that dispatch has its own cooldown/safety checks and is flatly
+    -- blocked before DotaTime()<-56 (most of the pregame draft window). This
+    -- used to send the hero the instant bot.SecretShop went true if the
+    -- courier merely wasn't MOVING *yet* - racing the courier and pulling
+    -- the hero out of lane for an item the disposable courier was about to
+    -- fetch anyway. Give the courier a real grace window before the hero
+    -- ever considers walking itself.
+    local COURIER_GRACE_SECONDS = 30
+    if bot.SecretShop then
+        if bot._ohaSecretShopPendingSince == nil then bot._ohaSecretShopPendingSince = DotaTime() end
+    else
+        bot._ohaSecretShopPendingSince = nil
+    end
+
     local courier = bot.theCourier
     local courierState = courier ~= nil and GetCourierState(courier) or COURIER_STATE_DEAD
-    if bot.SecretShop and courierState ~= COURIER_STATE_MOVING then
+    local courierOverdue = DotaTime() - (bot._ohaSecretShopPendingSince or DotaTime()) > COURIER_GRACE_SECONDS
+    if bot.SecretShop and courierState ~= COURIER_STATE_MOVING
+        and (courierState == COURIER_STATE_DEAD or courierOverdue)
+    then
         shopLocation = X.GetPreferredSecretShop()
         if shopLocation ~= nil and courierState == COURIER_STATE_DEAD then
             return RemapValClamped(GetUnitToLocationDistance(bot, shopLocation), 6000, 0, 0.7, 0.85)
