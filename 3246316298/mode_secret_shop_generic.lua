@@ -8,6 +8,7 @@ end
 
 local J = require(GetScriptDirectory() .. '/FuncLib/func_utils')
 local Customize = require(GetScriptDirectory() .. '/FuncLib/systems/custom_loader')
+local DecisionPolicy = require(GetScriptDirectory() .. '/FuncLib/systems/decision_policy')
 Customize.ThinkLess = Customize.Enable and Customize.ThinkLess or 1
 
 local X = {}
@@ -22,7 +23,14 @@ end
 
 function GetDesireHelper()
     if J.Utils.IsTeamPushingSecondTierOrHighGround(bot) then return BOT_MODE_DESIRE_NONE end
-    if J.IsInLaningPhase() and J.GetPosition(bot) <= 3 and DotaTime() < 12 * 60 then
+    -- J.IsInLaningPhase() just reads bot.isInLanePhase, a flag only
+    -- mode_laning_generic.lua sets - and that file returns before ever
+    -- setting it whenever DotaTime()<0 (the whole pre-horn strategy-time
+    -- window). That left this guard disabled at exactly the moment Pos 1-3
+    -- most needed it, pulling cores to the river-adjacent secret shop the
+    -- instant the horn hit. DecisionPolicy.IsLaneLocked() is time/position
+    -- based and doesn't depend on another mode's execution order.
+    if DecisionPolicy.IsLaneLocked(bot) then
         return BOT_MODE_DESIRE_NONE
     end
 

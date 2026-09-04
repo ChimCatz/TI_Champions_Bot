@@ -316,12 +316,13 @@ local function EvaluateCombat(bot, lane)
     end
     if best == nil then return nil end
 
-    -- Pure farm focus: while lane-locked (pos 1-3, pre-20:00/pre-T3), skip
-    -- the whole HARASS/PRESSURE decision tree entirely unless the bot was
-    -- just directly attacked (a genuine defensive trade). Constant petty
-    -- harassment at near-zero damage ratio was consuming 100% of a core's
-    -- attention and leaving no time to last-hit. An exceptionally safe,
-    -- clean kill is still allowed through even when untouched.
+    -- Farm-focused but not passive: while lane-locked (pos 1-3, pre-20:00/
+    -- pre-T3), never chase or step out toward a fight, and never skip a
+    -- last hit to throw a harass hit - but if an enemy hero is already
+    -- standing in attack range with a clearly safe trade, take it. Constant
+    -- petty harassment that required chasing was consuming 100% of a core's
+    -- attention and leaving no time to last-hit; standing still and never
+    -- fighting back unless attacked first was the opposite overcorrection.
     if DecisionPolicy.IsLaneLocked(bot) and not bot:WasRecentlyDamagedByAnyHero(2.5) then
         if best.killRatio >= 1.5
             and best.riskRatio <= 0.15
@@ -331,6 +332,16 @@ local function EvaluateCombat(bot, lane)
             and CombatSafety.CanCommit(bot, best.target, best.killRatio)
         then
             return best, 'KILL'
+        end
+        if not HasDyingCreep(bot)
+            and best.riskRatio <= 0.35
+            and best.enemies <= best.allies
+            and CountCreepsAttacking(bot) <= 1
+            and not best.towerRisk
+            and not TargetHasProtection(best.target)
+            and GetUnitToUnitDistance(bot, best.target) <= bot:GetAttackRange() + 150
+        then
+            return best, 'HARASS'
         end
         return nil
     end
@@ -368,10 +379,14 @@ local function EvaluateCombat(bot, lane)
     end
 
     if HasDyingCreep(bot) or J.GetHP(bot) < 0.52 then return nil end
+    -- Supports (pos 4-5) are meant to lean into harass - looser risk/creep
+    -- tolerance than cores, who still answer to IsNearOwnLane/lane-lock
+    -- elsewhere in this function.
+    local isSupport = J.GetPosition(bot) >= 4
     local enemyCreeps = CountCreepsAttacking(bot)
     local isolated = best.enemies <= 1
-    local safeTrade = best.riskRatio <= 0.62 * aggression
-        and enemyCreeps <= 2
+    local safeTrade = best.riskRatio <= (isSupport and 0.75 or 0.62) * aggression
+        and enemyCreeps <= (isSupport and 3 or 2)
         and not best.towerRisk
     local approachBuffer = J.GetPosition(bot) >= 4 and 550 or 300
     local inReach = GetUnitToUnitDistance(bot, best.target) <= math.min(1500, bot:GetAttackRange() + approachBuffer)

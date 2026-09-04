@@ -120,6 +120,42 @@ configuration at `Config_Version = 6` or increment all matching copies together.
 - Added backpack promotion for important usable items.
 - Rebranded logs/chat to TI Champions Bot and added `[TICB-*]` tags.
 
+### 0.6.7 - Secret-shop pregame drift fixed, Pos 1-3 harass rebalanced, supports tuned more aggressive (match 8982169848)
+
+Root cause found via heartbeat log: Radiant Pos 1 Alchemist (and matching
+reports of Dire Pos 1/Radiant Pos 3) was walking to map-center/river-adjacent
+secret shop and idling there for ~20-30s right at horn (0:00), costing early
+last hits and leaving Alchemist level 1 at ~1:00, level 2 by minute 6.
+
+- **Root cause**: `mode_secret_shop_generic.lua`'s guard against pulling
+  Pos 1-3 to the shop during laning depended on `J.IsInLaningPhase()`, which
+  just reads `bot.isInLanePhase` - a flag only `mode_laning_generic.lua`
+  ever sets, and that file returns `NONE` at its very first line
+  (`DotaTime()<0`) *before* setting it. For the entire pre-horn strategy-time
+  window the flag was stuck false, so the guard never engaged; if the hero's
+  item build wanted anything from the shop (`bot.SecretShop=true`), that mode
+  won with 0.7-0.85 desire (vs. farm/laning's ~0) and dragged the core to the
+  shop the instant the game started. Fixed by gating on
+  `DecisionPolicy.IsLaneLocked(bot)` (time+position, no dependency on another
+  mode's execution order) instead of the fragile flag - also extends the
+  window from the old hardcoded 12:00 to the shared 20:00/pre-T3 lock.
+- **Pos 1-3 harass rebalance**: 0.6.6's lane-lock combat gate only allowed a
+  fight if the core had just been attacked, or an exceptionally clean/safe
+  kill was available - reported as too passive ("only use spells when
+  attacked"). Loosened to also allow a safe in-range poke (`HARASS`) when an
+  enemy hero is already standing within the core's attack range + 150, risk
+  is low, allies aren't outnumbered, and it won't cost a last hit
+  (`HasDyingCreep` check) - still never chases or steps out toward a fight.
+- **Supports tuned more aggressive**: no specific bug reported, just general
+  tuning per request. Pos 4-5's `HARASS` risk tolerance raised from
+  `0.62*aggression` to `0.75*aggression` and simultaneous-attacking-creep
+  cap raised from 2 to 3, so supports lean harder into poking/harassing
+  during laning. Deny priority (`CreepPolicy.HasPriorityCreep`) already
+  checked denies before last hits for position >= 4; left untouched as
+  already correct.
+- Validated: `luac -p` individually and full-workspace loop, both clean.
+  Deployed via SHA-256-verified copy to Workshop folder and release folder.
+
 ### 0.6.6 - Pure-farm lane lock, hard 30-min Roshan gate, ward target hierarchy, base-defend trigger, heartbeat logging (match 8982026058)
 
 Confirmed via this match's log: 0.6.5's lane-leash kept cores geographically
