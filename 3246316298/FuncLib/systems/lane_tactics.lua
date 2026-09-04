@@ -7,6 +7,7 @@ local DamageForecast = require(GetScriptDirectory() .. '/FuncLib/systems/damage_
 local CreepPolicy = require(GetScriptDirectory() .. '/FuncLib/systems/creep_policy')
 local Diagnostics = require(GetScriptDirectory() .. '/FuncLib/systems/decision_log')
 local EconomyPhase = require(GetScriptDirectory() .. '/FuncLib/systems/economy_phase')
+local DecisionPolicy = require(GetScriptDirectory() .. '/FuncLib/systems/decision_policy')
 J.IsInLaningPhase = EconomyPhase.IsActive
 
 local X = {}
@@ -315,6 +316,25 @@ local function EvaluateCombat(bot, lane)
     end
     if best == nil then return nil end
 
+    -- Pure farm focus: while lane-locked (pos 1-3, pre-20:00/pre-T3), skip
+    -- the whole HARASS/PRESSURE decision tree entirely unless the bot was
+    -- just directly attacked (a genuine defensive trade). Constant petty
+    -- harassment at near-zero damage ratio was consuming 100% of a core's
+    -- attention and leaving no time to last-hit. An exceptionally safe,
+    -- clean kill is still allowed through even when untouched.
+    if DecisionPolicy.IsLaneLocked(bot) and not bot:WasRecentlyDamagedByAnyHero(2.5) then
+        if best.killRatio >= 1.5
+            and best.riskRatio <= 0.15
+            and best.enemies <= best.allies
+            and not best.towerRisk
+            and not TargetHasProtection(best.target)
+            and CombatSafety.CanCommit(bot, best.target, best.killRatio)
+        then
+            return best, 'KILL'
+        end
+        return nil
+    end
+
     local state = GetState(bot)
     local aggression = (tonumber(Customize.Lane_Aggression) or 1.0) * state.aggressionBias
     local numbersAcceptable = best.allies >= best.enemies
@@ -583,7 +603,9 @@ local function Update(bot, lane)
         return state
     end
 
-    if not RunePolicy.ShouldInterruptSupportTask(bot) then SelectNeutralTask(bot, lane, state) end
+    if not RunePolicy.ShouldInterruptSupportTask(bot) and not DecisionPolicy.IsLaneLocked(bot) then
+        SelectNeutralTask(bot, lane, state)
+    end
     return state
 end
 

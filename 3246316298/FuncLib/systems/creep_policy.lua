@@ -156,7 +156,7 @@ function X.CanActivelyClearWave(bot)
         or J.IsRetreating(bot)
         or J.GetHP(bot) < 0.42
         or bot:WasRecentlyDamagedByAnyHero(4.0)
-        or HasRecentEnemyRisk(bot, 1800, 5.0)
+        or HasRecentEnemyRisk(bot, 1500, 5.0)
     then
         return false
     end

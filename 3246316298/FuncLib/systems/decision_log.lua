@@ -55,4 +55,32 @@ function X.State(bot, previous, current, reason)
     X.Write(bot, 'LANE_STATE', '%s -> %s reason=%s', tostring(previous), tostring(current), tostring(reason))
 end
 
+local heartbeatLast = {}
+local HEARTBEAT_INTERVAL = 10
+
+-- Unconditional periodic snapshot (every 10s per bot, independent of the
+-- LANE_STATE/LANE_RECOVERY throttle above) so a full match has a
+-- position/status trail even for bots that never trigger another category -
+-- requested so match reviews don't need extra explanation of who was where.
+function X.Heartbeat(bot)
+    if not enabled or bot == nil then return end
+    local key = BotKey(bot)
+    local now = DotaTime()
+    if now < (heartbeatLast[key] or -1e9) + HEARTBEAT_INTERVAL then return end
+    heartbeatLast[key] = now
+    local okHp, hpPct = pcall(function() return 100 * bot:GetHealth() / math.max(1, bot:GetMaxHealth()) end)
+    local okMp, mpPct = pcall(function() return 100 * bot:GetMana() / math.max(1, bot:GetMaxMana()) end)
+    local okLvl, level = pcall(function() return bot:GetLevel() end)
+    local okGold, gold = pcall(function() return bot:GetGold() end)
+    local okMode, mode = pcall(function() return bot:GetActiveMode() end)
+    Output(string.format('[TICB-HEARTBEAT][%s] hp=%s%% mana=%s%% lvl=%s gold=%s mode=%s exit=%s',
+        BotLabel(bot),
+        okHp and string.format('%.0f', hpPct) or '?',
+        okMp and string.format('%.0f', mpPct) or '?',
+        tostring(okLvl and level or '?'),
+        tostring(okGold and gold or '?'),
+        tostring(okMode and mode or '?'),
+        tostring(bot._farmExitReason or '-')))
+end
+
 return X

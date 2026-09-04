@@ -1,26 +1,20 @@
 local J = require(GetScriptDirectory() .. '/FuncLib/func_utils')
 local Customize = require(GetScriptDirectory() .. '/FuncLib/systems/custom_loader')
 local Diagnostics = require(GetScriptDirectory() .. '/FuncLib/systems/decision_log')
-local EconomyPhase = require(GetScriptDirectory() .. '/FuncLib/systems/economy_phase')
+local DecisionPolicy = require(GetScriptDirectory() .. '/FuncLib/systems/decision_policy')
 
 local X = {}
 local SEARCH_RADIUS = 1250
 local GROUP_RADIUS = 1400
 local LOCK_SECONDS = 3.2
 local MIN_ACTIVATION_TIME = 30
-local OWN_LANE_LEASH = 2600
 
--- Cores (pos 1-3) own a specific lane. Without this, a bot that merely ended
--- up standing near mid (e.g. during the minute-0 rune scramble) gets locked
--- into a multi-bot "punishment" chase far from its lane, for the whole
--- laning phase. Supports (pos 4-5) are exempt since roaming is their job.
+-- Cores (pos 1-3) own a specific lane and must stay there while lane-locked
+-- (pre-20:00/pre-T3) - no exceptions, this is exactly the cross-lane
+-- "assisting" the lock is meant to eliminate. Supports (pos 4-5) are exempt
+-- since roaming is their job.
 local function IsNearOwnLane(bot)
-    if not EconomyPhase.IsActive() then return true end
-    local position = J.GetPosition(bot)
-    if position == nil or position > 3 then return true end
-    local lane = bot:GetAssignedLane() or LANE_MID
-    local front = GetLaneFrontLocation(GetTeam(), lane, 0)
-    return GetUnitToLocationDistance(bot, front) <= OWN_LANE_LEASH
+    return not DecisionPolicy.IsLaneLocked(bot)
 end
 
 local function IsEnemy(unit)

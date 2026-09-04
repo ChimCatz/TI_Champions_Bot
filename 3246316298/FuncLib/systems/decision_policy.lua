@@ -32,11 +32,35 @@ local function IsAnyTier3TowerDown()
     return false
 end
 
-function X.ShouldForceLaneCommitment(bot)
+-- Shared by lane_tactics.lua and combat_coordination.lua so "must stay in
+-- lane" means the same window everywhere: before 20:00 and before any
+-- Tier-3 tower anywhere has fallen.
+function X.IsLaneLockActive()
+    return DotaTime() < LANE_LOCK_END_TIME and not IsAnyTier3TowerDown()
+end
+
+function X.IsLaneLocked(bot)
     local position = J.GetPosition(bot)
-    if position == nil or position > 3 then return false end
-    if DotaTime() >= LANE_LOCK_END_TIME or IsAnyTier3TowerDown() then return false end
+    return position ~= nil and position <= 3 and X.IsLaneLockActive()
+end
+
+function X.ShouldForceLaneCommitment(bot)
+    if not X.IsLaneLocked(bot) then return false end
     return LaneDiscipline.ShouldReturnToLane(bot)
+end
+
+local BASE_DEFEND_ANCIENT_RADIUS = 4000
+
+-- Any position, no exceptions: an enemy hero merely seen near the ancient or
+-- on our own high ground is enough to pull everyone home, even a core deep
+-- in the enemy jungle. This is a decisive vision-based trigger layered on
+-- top of the base engine's own (slower/threshold-based) defend logic.
+function X.ShouldDefendBase(bot)
+    if bot == nil or not bot:IsAlive() then return false end
+    local ancient = GetAncient(GetTeam())
+    if ancient == nil then return false end
+    return J.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 1
+        or J.Utils.CountEnemyHeroesNear(ancient:GetLocation(), BASE_DEFEND_ANCIENT_RADIUS) >= 1
 end
 
 local function IsHealthyResponder(unit)

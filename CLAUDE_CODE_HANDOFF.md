@@ -120,6 +120,81 @@ configuration at `Config_Version = 6` or increment all matching copies together.
 - Added backpack promotion for important usable items.
 - Rebranded logs/chat to TI Champions Bot and added `[TICB-*]` tags.
 
+### 0.6.6 - Pure-farm lane lock, hard 30-min Roshan gate, ward target hierarchy, base-defend trigger, heartbeat logging (match 8982026058)
+
+Confirmed via this match's log: 0.6.5's lane-leash kept cores geographically
+near their lane, but they were still cycling HARASS/PRESSURE/LANE_RECOVERY
+every 2-10 seconds continuously (often at near-zero damage ratio), consuming
+100% of their attention and leaving no time to last-hit - explains
+Phantom Lancer being level 4 at minute 10. User requested (and confirmed via
+clarifying questions) a much stricter "pure farm focus" for positions 1-3.
+
+- **`decision_policy.lua`**: added `X.IsLaneLockActive()` (DotaTime() < 20:00
+  AND no Tier-3 tower fallen anywhere - shared by every system below so "must
+  stay in lane" means the same window everywhere) and `X.IsLaneLocked(bot)`
+  (position <= 3 AND lock active). `ShouldForceLaneCommitment` now built on
+  top of these. Added `X.ShouldDefendBase(bot)`: any position, any enemy hero
+  merely seen near the ancient (4000 units) or on our own high ground forces
+  an immediate farm-desire suppression, overriding even the lane lock -
+  addresses "force all bots to defend base" (item 4). This layers on top of
+  the base engine's own slower defend-desire system rather than replacing it.
+- **`lane_tactics.lua`**: `EvaluateCombat` now skips the entire
+  HARASS/PRESSURE decision tree while lane-locked, unless the bot was
+  directly attacked in the last 2.5s (a genuine defensive trade) - only an
+  exceptionally clean, low-risk kill (ratio >= 1.5, risk <= 0.15, not
+  outnumbered) is allowed through untouched. `SelectNeutralTask`
+  (pull/stack) is also skipped while locked - no side-tasks, pure lane focus.
+  Now requires `decision_policy.lua` (no circular dependency - traced the
+  full require graph).
+- **`combat_coordination.lua`**: the 3-bot "punishment" system's lane
+  exemption now uses the same shared `IsLaneLocked` - locked cores can never
+  participate in cross-map coordinated ganks, matching "no assisting other
+  lanes."
+- **`objective_policy.lua`**: Roshan gate rewritten per explicit
+  instruction. `MIN_ROSH_TIME` raised 15:00 -> 30:00 with zero exceptions;
+  the human-ping bypass path removed entirely (was also present as a
+  *separate*, looser bypass inside `mode_roshan_generic.lua` itself, but
+  traced that file's `GetDesire()` and confirmed `ObjectivePolicy.GetState()`
+  is checked first and unconditionally, so tightening this one gate is
+  sufficient regardless of that file's own logic). The advantage check now
+  counts bots only (`IsPlayerBot` filter) so a human's presence doesn't
+  factor in. Added death-during-commit detection: if ally-alive-bots drops
+  while `commitRoshan` was true, the sticky 50s commit window is cleared
+  immediately rather than riding out - "forget the roshan and go back to the
+  tactics," no fixed cooldown, just requires the numbers criterion to be
+  freshly re-satisfied (naturally harder right after a death, per the user's
+  own answer: "until next full team wipe/reset").
+- **`FuncLib/hero/minion_lib/attacking_wards.lua` +
+  `.../minion_lib/utils.lua`**: rewrote the target-priority hierarchy for
+  all "attacking ward" minions (Shadow Shaman's Serpent Wards, Venomancer's
+  Plague Wards, Witch Doctor's Death Ward - one shared file covers all
+  three). Old order was hero -> any enemy creep -> tower, so a ward parked
+  near a tower with nothing else in its short attack range sat fully idle.
+  New order per explicit clarification: enemy heroes -> enemy-controlled
+  summoned units (familiars, dominated creeps, treants - detected via
+  `GetPlayerOwnerID() >= 0`, which plain lane/neutral creeps don't have) ->
+  towers/buildings -> plain enemy creeps (last resort, so it's never idle).
+- **`creep_policy.lua`**: `CanActivelyClearWave`'s enemy-visibility radius
+  aligned from 1800 to the user's literal 1500 spec.
+- **Heartbeat logging added** (`decision_log.lua`): `[TICB-HEARTBEAT]` line
+  every 10 seconds per bot (independent throttle from the 1.5s diagnostic
+  interval) - team/position/lane/location (via the existing `BotLabel`),
+  HP%, mana%, level, gold, active mode, and the bot's last farm-exit reason.
+  Hooked into `mode_farm_generic.lua`'s `GetDesire()`, which the engine calls
+  every tick for every bot regardless of which mode is actually active, so
+  this fires reliably no matter what the bot is doing. Per explicit choice,
+  this writes to the same `console.<matchid>.log` rather than a separate
+  file (untested whether Source 2 VScript's sandbox even permits arbitrary
+  file I/O - would need verification before attempting that path).
+- Not attempted tonight: proactively walking a locked core up to attack an
+  enemy tower once its wave is clear (relies on the existing, more mature
+  `CreepPolicy.CanActivelyClearWave` / push.lua systems rather than a new
+  one - the scope here was removing the combat/recovery volatility that was
+  preventing cores from ever reaching a calm, safe-to-push state, not
+  rebuilding the push system itself).
+- All nine changed files parse-checked clean (`luac -p`, whole workspace)
+  and synced by SHA-256 to the Workshop deployment and `TI-Champions-Bot/bots`.
+
 ### 0.6.5 - Lane lock, naming simplified per request, Roshan mutual-clash gap, rune mislabel (match 8980663786)
 
 - **Naming: abandoned slot/position matching entirely, per explicit request.**

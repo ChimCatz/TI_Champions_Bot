@@ -6,6 +6,7 @@ local DecisivePush=require(GetScriptDirectory()..'/FuncLib/systems/decisive_push
 local ObjectivePolicy=require(GetScriptDirectory()..'/FuncLib/systems/objective_policy')
 local FarmTiming=require(GetScriptDirectory()..'/FuncLib/systems/farm_timing')
 local FarmAbilityPolicy=require(GetScriptDirectory()..'/FuncLib/systems/farm_ability_policy')
+local Diagnostics=require(GetScriptDirectory()..'/FuncLib/systems/decision_log')
 local l=nil;
 local m=0;
 local n={}local o={}local p=0;
@@ -32,10 +33,12 @@ local R={[BOT_MODE_LANING]='mode_laning',[BOT_MODE_FARM]='mode_farming',[BOT_MOD
 function f.GetModeLocaleKey(S)return R[S]or'mode_other'end;
 if e.farmLocation==nil then e.farmLocation=e:GetLocation()end;
 function GetDesire()if ShouldSkipBotThink(GetBot())then return 0 end;
+Diagnostics.Heartbeat(e)
 if e.isBear or string.find(e:GetUnitName(),'lone_druid_bear')then local T=e:HasModifier('modifier_item_ultimate_scepter_consumed')or e:FindItemSlot('item_ultimate_scepter')>=0;
 if not T then local a=require(GetScriptDirectory()..'/FuncLib/systems/utils')local U=a.GetLoneDruid(e)if U and U.hero and g.IsValidHero(U.hero)and U.hero:IsAlive()then if U.hero:GetActiveMode()==BOT_MODE_FARM then return U.hero:GetActiveModeDesire()+0.05 end end end end;
 local V,W=pcall(GetDesireHelper)if not V then if IsDebug then log('[FARM-ERROR] %s %s',e:GetUnitName(),tostring(W))end;
 return BOT_MODE_DESIRE_VERYLOW end;
+if DecisionPolicy.ShouldDefendBase(e)then e._farmExitReason='defend_base'return BOT_MODE_DESIRE_NONE end;
 if DecisivePush.ShouldSuppressFarm()then e._farmExitReason='decisive_push'return BOT_MODE_DESIRE_NONE end;
 if ObjectivePolicy.ShouldCommitRoshan()then e._farmExitReason='roshan_commit'return BOT_MODE_DESIRE_NONE end;
 if LaneTactics.GetCombatIntent(e,e:GetAssignedLane())~=nil then e._farmExitReason='lane_combat'return BOT_MODE_DESIRE_NONE end;
