@@ -99,14 +99,24 @@ function X.Heartbeat(bot)
     local okLvl, level = pcall(function() return bot:GetLevel() end)
     local okGold, gold = pcall(function() return bot:GetGold() end)
     local okMode, mode = pcall(function() return bot:GetActiveMode() end)
-    Output(string.format('[TICB-HEARTBEAT][%s] hp=%s%% mana=%s%% lvl=%s gold=%s mode=%s exit=%s',
+    local okKda, kills, deaths, assists = pcall(function()
+        local id = bot:GetPlayerID()
+        return GetHeroKills(id), GetHeroDeaths(id), GetHeroAssists(id)
+    end)
+    local okTarget, target = pcall(function()
+        local t = bot:GetTarget()
+        return t ~= nil and t:GetUnitName() or '-'
+    end)
+    Output(string.format('[TICB-HEARTBEAT][%s] hp=%s%% mana=%s%% lvl=%s gold=%s kda=%s mode=%s exit=%s target=%s',
         BotLabel(bot),
         okHp and string.format('%.0f', hpPct) or '?',
         okMp and string.format('%.0f', mpPct) or '?',
         tostring(okLvl and level or '?'),
         tostring(okGold and gold or '?'),
+        okKda and string.format('%d/%d/%d', kills, deaths, assists) or '?/?/?',
         okMode and ModeName(mode) or '?',
-        tostring(bot._farmExitReason or '-')))
+        tostring(bot._farmExitReason or '-'),
+        okTarget and target or '?'))
 end
 
 return X

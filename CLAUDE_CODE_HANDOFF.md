@@ -120,6 +120,55 @@ configuration at `Config_Version = 6` or increment all matching copies together.
 - Added backpack promotion for important usable items.
 - Rebranded logs/chat to TI Champions Bot and added `[TICB-*]` tags.
 
+### 0.7.1 - Proactive audit: self-validating position/lane logging, hero-pool distribution check, recursion safety cap
+
+No new match yet (this round was requested before the next test) - a
+proactive audit of hero picking/position/lane assignment for further small
+bugs, plus a naming question about the previous match.
+
+- **Naming question answered from the log, not a code change**: checked
+  match 8982296896 (the one 0.6.9's name-pool fix was validated against) -
+  its 9 `ClientPutInServer` lines are all from the HULIGANI/VISION roster
+  pair, no "TSpirit"/"Yatoro" anywhere in the file, and Anti-Mage (Pos 1,
+  playerID 0) maps to a real assigned name ("HULIGANI.ssnovv1") by the same
+  sequential-apply contract used throughout this codebase. Could not find
+  evidence of either report in this log - most likely either a recollection
+  of the earlier match that genuinely did use the TSpirit roster
+  (8982243476, before the 0.6.9 fix), or a live client-side rendering quirk
+  the text log wouldn't capture either way. Nothing changed here; flagged
+  back to the user to double check on the next occurrence.
+- **Hero position-weight table audited** (`FuncLib/data/hero_pos_weights.lua`,
+  127 heroes): no malformed entries, no all-zero (unpickable) heroes, every
+  position has a healthy pool of eligible heroes (56-125 out of 127,
+  lowest as expected for Pos 5 hard support). The weight *data* was never
+  the problem - confirms 0.7.0's diagnosis that the bug was purely in how
+  the picked position got relabeled afterward, not in what got picked.
+- **Added a self-check that would have caught the Jakiro bug immediately**:
+  `farm_timing.lua`'s `ConfigurePurchaseList` (already the single place
+  `TICB-ITEM` fires once per hero) now also cross-checks the assigned
+  position against that hero's own weight table entry, and the assigned
+  lane against the expected lane for that position/team - logging
+  `[TICB-VALIDATE][WARNING]` immediately if either ever looks wrong again.
+  `TICB-ITEM` itself now also prints the resolved lane.
+- **Found and defused a latent, unconfirmed-in-practice bug**: hero
+  selection's candidate-pool builder (`N(D,J)` in `hero_selection.lua`)
+  recurses on itself with no depth limit whenever fewer than 6 heroes pass
+  its archetype filter, re-rolling `RandomInt` against the same weight
+  table each time with no guarantee of eventual success - a theoretical
+  unbounded-recursion/stack-overflow risk under a heavily
+  banned/customized hero pool, never observed to actually fire in these
+  logs. Added a 25-attempt cap as cheap insurance; normal-pool behavior is
+  unaffected (this codebase always has 50+ eligible heroes per position).
+- **Heartbeat logging expanded**: `TICB-HEARTBEAT` now also includes
+  kills/deaths/assists and current target unit, on top of the existing
+  hp/mana/level/gold/mode/exit-reason - closer to "all the small
+  background information" requested.
+- Validated: `luac -p` individually and full-workspace loop, both clean.
+  Deployed via SHA-256-verified copy to Workshop folder and release folder.
+  Standalone distribution audit run via a real `lua.exe` interpreter
+  against the actual `hero_pos_weights.lua` module (script not committed -
+  one-off analysis, results captured here).
+
 ### 0.7.0 - Position-label mismatch fixed (root cause of Jakiro-as-Pos-1 and likely much of the river-attitude reports), lane-commitment hysteresis (match 8982296896)
 
 Match reported: naming confirmed fixed by the user's own observation; Radiant

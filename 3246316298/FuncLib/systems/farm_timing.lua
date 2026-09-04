@@ -1,6 +1,44 @@
 local J = require(GetScriptDirectory() .. '/FuncLib/func_utils')
+local HeroPosWeights = require(GetScriptDirectory() .. '/FuncLib/data/hero_pos_weights')
 
 local X = {}
+
+-- Expected lane per position per team, matching hero_selection.lua's V/W
+-- maps used to build the actual lane assignment - kept here independently
+-- so this validation doesn't have to reach into hero_selection.lua's
+-- private locals, and stays correct even if that file's internals change.
+local EXPECTED_LANE = {
+    [TEAM_RADIANT] = { [1] = LANE_BOT, [2] = LANE_MID, [3] = LANE_TOP, [4] = LANE_TOP, [5] = LANE_BOT },
+    [TEAM_DIRE] = { [1] = LANE_TOP, [2] = LANE_MID, [3] = LANE_BOT, [4] = LANE_BOT, [5] = LANE_TOP },
+}
+local LANE_NAMES = { [LANE_TOP] = 'TOP', [LANE_MID] = 'MID', [LANE_BOT] = 'BOT' }
+
+-- One-time self-check, run right alongside the existing TICB-ITEM line so a
+-- position/hero-suitability or position/lane mismatch (the Jakiro-as-Pos1
+-- class of bug fixed in 0.7.0) is immediately visible in the log again if
+-- it ever regresses, instead of requiring another multi-match investigation.
+local function ValidateAssignment(bot, position, team)
+    local weights = HeroPosWeights.GetHeroPositions()[bot:GetUnitName()]
+    if weights ~= nil and (weights[position] or 0) <= 5 then
+        pcall(function()
+            print(string.format(
+                '[TICB-VALIDATE][WARNING] %s labeled pos%d but its weight for that position is only %d (weights=%d,%d,%d,%d,%d) - likely a position-label mismatch',
+                bot:GetUnitName(), position, weights[position] or 0,
+                weights[1] or 0, weights[2] or 0, weights[3] or 0, weights[4] or 0, weights[5] or 0))
+        end)
+    end
+
+    local expected = EXPECTED_LANE[team] and EXPECTED_LANE[team][position]
+    local okLane, actualLane = pcall(function() return bot:GetAssignedLane() end)
+    if expected ~= nil and okLane and actualLane ~= expected then
+        pcall(function()
+            print(string.format(
+                '[TICB-VALIDATE][WARNING] %s pos%d assigned lane=%s but expected lane=%s for this position/team',
+                bot:GetUnitName(), position, tostring(LANE_NAMES[actualLane] or actualLane),
+                tostring(LANE_NAMES[expected] or expected)))
+        end)
+    end
+end
 
 local DEADLINES = {
     [1] = 18 * 60,
@@ -67,11 +105,14 @@ function X.ConfigurePurchaseList(bot, purchaseList)
         target = DEADLINES[position],
         position = position,
     }
+    local team = bot:GetTeam()
     pcall(function()
-        local team = bot:GetTeam() == TEAM_RADIANT and 'Radiant' or 'Dire'
-        print(string.format('[TICB-ITEM] team=%s hero=%s pos=%d first_major=%s deadline=%.0f',
-            team, bot:GetUnitName(), position, tostring(target), DEADLINES[position] or 0))
+        local okLane, lane = pcall(function() return bot:GetAssignedLane() end)
+        print(string.format('[TICB-ITEM] team=%s hero=%s pos=%d lane=%s first_major=%s deadline=%.0f',
+            team == TEAM_RADIANT and 'Radiant' or 'Dire', bot:GetUnitName(), position,
+            (okLane and LANE_NAMES[lane]) or '?', tostring(target), DEADLINES[position] or 0))
     end)
+    ValidateAssignment(bot, position, team)
 end
 
 function X.GetState(bot)
