@@ -120,6 +120,34 @@ configuration at `Config_Version = 6` or increment all matching copies together.
 - Added backpack promotion for important usable items.
 - Rebranded logs/chat to TI Champions Bot and added `[TICB-*]` tags.
 
+### 0.7.5 - Proactive safe-wave push for cores, obsolete starter-item auto-sell
+
+Same round as 0.7.4's lane-assignment fix - two smaller, contained items
+from the user's 8-item list, implemented now; the rest (shared team push-
+priority system, general ward-clearing, general blink-combo rule, fog-
+respecting retreat pathing) explicitly scoped and deferred to the next
+round (the user's own planned bots-only spectator match) rather than rushed.
+
+- **Passive-core fix** (`mode_farm_generic.lua`): `CreepPolicy.
+  FindSafeWaveClearTarget`'s attack-the-wave logic already existed, but its
+  only caller was `mode_laning_generic.lua`'s `Think()` - which only runs
+  when THAT mode is active. Farm mode is very often the active mode for a
+  core near its own lane, and had no equivalent "there's a free, safe wave
+  right here" reflex of its own, just neutral-camp routing - so a core
+  could end up doing nothing productive next to an attackable, hero-free
+  wave (the Skywrath Mage report). Added the same check directly to farm
+  mode's `Think()`, so it's the default regardless of which mode nominally
+  won that tick.
+- **Obsolete starter-item auto-sell** (`inventory_policy.lua`): added
+  `X.SellObsoleteItems`, an explicit, narrow, threshold-based list (Quelling
+  Blade only, sellable after 14:00) rather than a general "looks outgrown"
+  heuristic, per the user's conservative choice. Wired into
+  `item_purchase_generic.lua`'s `ItemPurchaseThink` alongside the existing
+  `InventoryPolicy.Optimize` call.
+- Validated: `luac -p` individually and full-workspace loop, both clean.
+  Deployed via SHA-256-verified copy to Workshop folder and release folder.
+  Not yet verified in a live match.
+
 ### 0.7.4 - Fixed Dire's lane-assignment scramble (major - likely explains much of the multi-session "Pos 1 river attitude" saga) (match 8983102083, 42 min)
 
 0.7.2/0.7.3's new `[TICB-VALIDATE]` lane check immediately paid for itself:

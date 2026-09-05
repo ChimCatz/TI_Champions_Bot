@@ -7,6 +7,7 @@ local ObjectivePolicy=require(GetScriptDirectory()..'/FuncLib/systems/objective_
 local FarmTiming=require(GetScriptDirectory()..'/FuncLib/systems/farm_timing')
 local FarmAbilityPolicy=require(GetScriptDirectory()..'/FuncLib/systems/farm_ability_policy')
 local Diagnostics=require(GetScriptDirectory()..'/FuncLib/systems/decision_log')
+local CreepPolicy=require(GetScriptDirectory()..'/FuncLib/systems/creep_policy')
 local l=nil;
 local m=0;
 local n={}local o={}local p=0;
@@ -148,6 +149,18 @@ local b2=g.CanNotUseAction(e)local b3=e:GetNearbyLaneCreeps(1200,true)local b4=e
 if g.CanNotUseAction(e)then return end;
 if g.GetHP(e)<0.35 and e:WasRecentlyDamagedByAnyHero(3.0)then local b5=g.GetTeamFountain()e:Action_MoveToLocation(b5)return end;
 if FarmAbilityPolicy.TryCast(e)then return end;
+-- Farm mode is very often the ACTIVE mode for a core sitting near its own
+-- (safe) lane wave, but its own logic below is entirely about neutral-camp
+-- routing - it had no explicit "there's a free, safe wave right here, hit
+-- it" behavior, so a core near a hero-free wave with nothing better to do
+-- could end up doing nothing productive at all (mode_laning_generic.lua
+-- has this exact check in its own Think(), but that only runs when THAT
+-- mode is active). Give farm mode the same reflex directly so it's the
+-- default regardless of which mode nominally "won" that tick.
+do
+    local waveClearTarget=CreepPolicy.FindSafeWaveClearTarget(e,e:GetNearbyLaneCreeps(1200,true) or {})
+    if g.IsValid(waveClearTarget)then e:SetTarget(waveClearTarget)e:Action_AttackUnit(waveClearTarget,true)return end
+end;
 local b6={}for au=1,#GetTeamPlayers(GetTeam())do local av=GetTeamMember(au)if av~=nil and av~=e and av:IsAlive()then local S=av:GetActiveMode()if S==BOT_MODE_PUSH_TOWER_TOP or S==BOT_MODE_PUSH_TOWER_MID or S==BOT_MODE_PUSH_TOWER_BOT then if GetUnitToUnitDistance(e,av)<5000 then table.insert(b6,av)end end end end;
 if#b6>=3 then local b7=g.GetCenterOfUnits(b6)local b8=math.max(e:GetAttackRange()/2,150)local b9=g.AdjustLocationWithOffsetTowardsFountain(b7,b8)e:Action_MoveToLocation(b9)return end;
 if e.isBear or string.find(e:GetUnitName(),'lone_druid_bear')then local a=require(GetScriptDirectory()..'/FuncLib/systems/utils')local U=a.GetLoneDruid(e)if U and U.hero and g.IsValidHero(U.hero)then local ba=U.hero:GetAttackTarget()if g.IsValid(ba)and g.CanBeAttacked(ba)and GetUnitToUnitDistance(e,ba)<1200 then e:Action_AttackUnit(ba,true)return end;

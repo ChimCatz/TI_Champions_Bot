@@ -37,6 +37,40 @@ local function Score(item)
     return (GetItemCost(name) or 0) + (PRIORITY[name] or 0) + (LOW_VALUE[name] or 0)
 end
 
+-- Conservative, explicit list only - never guess at whether a component or
+-- situational item is still useful. Each entry becomes sellable once
+-- DotaTime() passes its threshold, on the theory that whatever early-game
+-- value it had (laning cleave/attack speed, mana sustain, etc.) is long
+-- gone by then and the inventory slot matters more. Deliberately narrow per
+-- explicit request rather than a general "sell whatever looks outgrown"
+-- heuristic - e.g. Underlord still holding a Quelling Blade deep into the
+-- game.
+local OBSOLETE_AFTER = {
+    item_quelling_blade = 14 * 60,
+}
+
+-- Sells a clearly-obsolete starter item once its usefulness window has
+-- passed. Safe to call every tick from item purchase logic - throttled and
+-- a no-op once nothing in OBSOLETE_AFTER is both present and past due.
+function X.SellObsoleteItems(bot)
+    if bot == nil or not bot:IsAlive() then return end
+    local now = DotaTime()
+    if now < (bot._ticbObsoleteCheckAt or -90) then return end
+    bot._ticbObsoleteCheckAt = now + 5.0
+
+    for itemName, threshold in pairs(OBSOLETE_AFTER) do
+        if now >= threshold then
+            local slot = bot:FindItemSlot(itemName)
+            if slot >= 0 and slot <= 5 then
+                local item = bot:GetItemInSlot(slot)
+                if item ~= nil then
+                    bot:ActionImmediate_SellItem(item)
+                end
+            end
+        end
+    end
+end
+
 function X.Optimize(bot)
     local now = DotaTime()
     if now < (bot._ticbInventoryCheckAt or -90) then return false end
