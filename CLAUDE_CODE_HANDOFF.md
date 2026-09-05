@@ -120,6 +120,45 @@ configuration at `Config_Version = 6` or increment all matching copies together.
 - Added backpack promotion for important usable items.
 - Rebranded logs/chat to TI Champions Bot and added `[TICB-*]` tags.
 
+### 0.7.4 - Fixed Dire's lane-assignment scramble (major - likely explains much of the multi-session "Pos 1 river attitude" saga) (match 8983102083, 42 min)
+
+0.7.2/0.7.3's new `[TICB-VALIDATE]` lane check immediately paid for itself:
+this match showed Dire Pos 1 Bristleback assigned `lane=MID` (expected TOP),
+Pos 2 Underlord assigned `lane=BOT` (expected MID), Pos 4 Warlock assigned
+`lane=TOP` (expected BOT) - a clean one-slot rotation, Dire only, zero
+mismatches on Radiant.
+
+- **Root cause**: `hero_selection.lua`'s `az()` function, which populates
+  `f[team]` (the array `UpdateLaneAssignments()` returns - read by the
+  ENGINE itself, keyed by the same raw `GetTeamPlayers(team)` index it uses
+  to apply lanes to each player). Radiant's branch does this correctly:
+  `f.TEAM_RADIANT[Z] = V[RoleAssignment[Z]]`, storing and reading at the
+  same index `Z`. Dire's branch was different: it processed the human
+  first, then the bots, storing results into a *remapped* "human-first"
+  index `aB` while still looking the lane VALUE up using the *raw* index
+  `Z` (`f.TEAM_DIRE[aB] = W[RoleAssignment[Z]]`) - two different indices
+  into the same array. Since `RoleAssignment` is unconditionally reset to
+  plain identity `{1,2,3,4,5}` before this runs (confirmed - this was a
+  leftover from the pre-0.5.0 role-shuffling system, which used to give
+  `RoleAssignment[Z]` real per-slot meaning), this reduces to `f.TEAM_DIRE[aB]
+  = W[Z]` - silently correct only on the coincidence that the human already
+  sat at Dire's raw slot 1, and scrambled by one rotation otherwise. Cross-
+  referencing Bristleback's heartbeats confirmed he spent the *entire*
+  42-minute match with `lane=MID` - not random wandering near the river/
+  Roshan/secret-shop area as it looked, but a hero correctly, consistently
+  playing the wrong lane the whole game, because that lane runs right past
+  that exact area. This is very likely a significant contributor to many of
+  this session's "Pos 1/2 river attitude" reports whenever the human
+  happened to be on Dire.
+- **Fix**: simplified Dire's branch in `az()` to exactly mirror Radiant's
+  (`f.TEAM_DIRE[Z] = W[RoleAssignment[Z]]`), dropping the now-pointless
+  human-first two-pass/remap bookkeeping entirely.
+- Also ran the full hero-pool distribution audit again and reviewed this
+  match's `TICB-VALIDATE` output for position/weight mismatches (0.7.0's
+  fix) - none found; only the lane-side bug above.
+- Validated: `luac -p` full-workspace loop, clean. Deployed via
+  SHA-256-verified copy to Workshop folder and release folder.
+
 ### 0.7.3 - Creep-wave-gated farm exception for cores, rune-stall diagnostics
 
 Follow-up to the 0.7.2 findings-and-questions round on match 8983037341.
