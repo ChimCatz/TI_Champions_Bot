@@ -120,6 +120,48 @@ configuration at `Config_Version = 6` or increment all matching copies together.
 - Added backpack promotion for important usable items.
 - Rebranded logs/chat to TI Champions Bot and added `[TICB-*]` tags.
 
+### 0.7.6 - Fixed cosmetic-placeholder items contaminating 83 of 128 hero buy lists (major), fixed obsolete-item-sell trigger
+
+User asked for a full item-build audit ("check all item builds and make
+sure no item build has an error"), plus clarified 0.7.5's obsolete-item
+feature was meant to unblock stuck builds specifically, not proactively
+tidy up on a timer.
+
+- **Root cause found via static audit**: wrote a script (real `lua.exe`,
+  not the engine) that extracted every `m['pos_N']={...}` / `sBuyList']=
+  {...}` buy-list array literal from all 128 `BotsLib/hero_*.lua` files and
+  cross-checked every token against the canonical item list
+  (`FuncLib/data/item_names.lua`) plus the neutral item table. Result: 43
+  of 128 heroes had their buy list start with a cosmetic wearable/arcana
+  name instead of a real item - e.g. Alchemist's Pos 1 build literally
+  began `{"item_bristleback_outfit", "item_radiance", ...}`. 15 distinct
+  bogus tokens appeared 200 times total across 83 files (`_outfit` cosmetic
+  placeholders like `item_tank_outfit`/`item_mage_outfit`/`item_priest_
+  outfit`/etc., and arcana weapon names like `item_disperser`/
+  `item_devastator`/`item_harpoon`/`item_angels_demise`/`item_phylactery`).
+  These read as leftover role-archetype template placeholders (the outfit
+  names literally match hero archetypes - "tank", "mage", "priest",
+  "ranged_carry" - suggesting a generation template that was never fully
+  replaced with a real item for every hero/position). Effect: the purchase
+  state machine wasted early cycles trying to resolve a non-existent first
+  "item" before reaching the real build - a genuine, if usually minor,
+  drag on early-game item timing for the majority of the hero pool.
+- **Fix**: scripted removal of all 15 confirmed-bogus tokens from every
+  buy-list literal, regardless of quote style or position in the list.
+  Verified: re-ran the audit (zero remaining), checked for stray-comma
+  artifacts (none), spot-checked several diffs by hand, and confirmed
+  `sSellList`s were untouched (tokens only ever appeared in buy lists).
+- **Obsolete-item-sell trigger fixed** (`inventory_policy.lua`): per the
+  user's clarification, `SellObsoleteItems` now only sells (Quelling Blade,
+  still gated at 14:00+) once the inventory is completely full - i.e. only
+  when it would actually be blocking the next purchase/pickup - rather
+  than unconditionally once the timer passes regardless of whether there's
+  a real space problem.
+- Validated: `luac -p` full-workspace loop, clean, both this round and
+  after the 83-file bulk edit. Deployed via SHA-256-verified copy (all 128
+  `BotsLib/*.lua` files individually verified) to Workshop folder and
+  release folder.
+
 ### 0.7.5 - Proactive safe-wave push for cores, obsolete starter-item auto-sell
 
 Same round as 0.7.4's lane-assignment fix - two smaller, contained items

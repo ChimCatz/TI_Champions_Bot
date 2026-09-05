@@ -38,25 +38,31 @@ local function Score(item)
 end
 
 -- Conservative, explicit list only - never guess at whether a component or
--- situational item is still useful. Each entry becomes sellable once
--- DotaTime() passes its threshold, on the theory that whatever early-game
--- value it had (laning cleave/attack speed, mana sustain, etc.) is long
--- gone by then and the inventory slot matters more. Deliberately narrow per
--- explicit request rather than a general "sell whatever looks outgrown"
--- heuristic - e.g. Underlord still holding a Quelling Blade deep into the
--- game.
+-- situational item is still useful. Each entry becomes eligible once
+-- DotaTime() passes its threshold (whatever early-game value it had -
+-- laning cleave/attack speed, mana sustain, etc. - is long gone by then),
+-- but is only actually SOLD once the inventory is genuinely full and would
+-- otherwise block the next purchase/pickup - the point is unsticking a
+-- blocked build (e.g. Underlord still holding a Quelling Blade with no
+-- room left for his next item), not proactively tidying up a build that
+-- isn't actually stuck. Deliberately a narrow, explicit list rather than a
+-- general "sell whatever looks outgrown" heuristic.
 local OBSOLETE_AFTER = {
     item_quelling_blade = 14 * 60,
 }
 
--- Sells a clearly-obsolete starter item once its usefulness window has
--- passed. Safe to call every tick from item purchase logic - throttled and
--- a no-op once nothing in OBSOLETE_AFTER is both present and past due.
+-- Sells a clearly-obsolete starter item, but only once it's actually
+-- blocking progress (inventory completely full). Safe to call every tick
+-- from item purchase logic - throttled and a no-op the rest of the time.
 function X.SellObsoleteItems(bot)
     if bot == nil or not bot:IsAlive() then return end
     local now = DotaTime()
     if now < (bot._ticbObsoleteCheckAt or -90) then return end
     bot._ticbObsoleteCheckAt = now + 5.0
+
+    for slot = 0, 8 do
+        if bot:GetItemInSlot(slot) == nil then return end
+    end
 
     for itemName, threshold in pairs(OBSOLETE_AFTER) do
         if now >= threshold then
