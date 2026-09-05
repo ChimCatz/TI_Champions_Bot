@@ -51,6 +51,23 @@ local WAVE_SAFE_HERO_RADIUS = 1400
 local WAVE_SAFE_MAX_BOT_DISTANCE = 2200
 local LANE_TOWER_IDS = { [LANE_TOP] = TOWER_TOP_1, [LANE_MID] = TOWER_MID_1, [LANE_BOT] = TOWER_BOT_1 }
 
+local OWN_TOWER_SIEGE_RADIUS = 1400
+
+-- The wave-state/distance checks below are all about whether it's safe for
+-- a core to LEAVE the lane - none of them ask the opposite question: is our
+-- own tower back home actively under attack right now? A core/support could
+-- be judged "safe to jungle" by every existing signal while its own T1
+-- quietly fell to an unanswered push. This is a direct, cheap vision check
+-- that takes priority over all of them.
+function X.IsOwnTowerUnderSiege(bot)
+    local lane = bot:GetAssignedLane()
+    local towerId = lane ~= nil and LANE_TOWER_IDS[lane]
+    if towerId == nil then return false end
+    local ownTower = GetTower(GetTeam(), towerId)
+    if ownTower == nil or not ownTower:IsAlive() then return false end
+    return #(J.GetEnemiesNearLoc(ownTower:GetLocation(), OWN_TOWER_SIEGE_RADIUS) or {}) > 0
+end
+
 -- Explicit request: a raw distance leash was the wrong signal for "is it
 -- safe to leave the lane and farm a nearby camp" - it flickers tick to tick
 -- with no regard for what's actually happening in the lane. This checks the
@@ -93,6 +110,12 @@ function X.ShouldForceLaneCommitment(bot)
         return false
     end
 
+    if X.IsOwnTowerUnderSiege(bot) then
+        bot._ohaLaneCommitUntil = DotaTime() + LANE_COMMIT_HOLD_SECONDS
+        bot._ohaWasJungleExempt = false
+        return true
+    end
+
     if X.IsSafeToJungleNearLane(bot) then
         bot._ohaLaneCommitUntil = nil
         bot._ohaWasJungleExempt = true
@@ -120,6 +143,27 @@ function X.ShouldForceLaneCommitment(bot)
 end
 
 local BASE_DEFEND_ANCIENT_RADIUS = 4000
+local BASE_EXPOSED_ANCIENT_RADIUS = 5500
+local BARRACKS_IDS = {
+    BARRACKS_TOP_MELEE, BARRACKS_TOP_RANGED,
+    BARRACKS_MID_MELEE, BARRACKS_MID_RANGED,
+    BARRACKS_BOT_MELEE, BARRACKS_BOT_RANGED,
+}
+
+-- Once any of our own barracks falls, high ground is breached and the
+-- ancient itself is reachable - from that point on the team should treat
+-- an enemy anywhere near base as a real threat, not just one already
+-- standing on the high ground or right on top of the ancient. Previously
+-- the team kept farming/roaming right up until an enemy was already that
+-- close, which read as "not desperately trying to defend" even with the
+-- throne wide open.
+function X.IsThroneExposed()
+    for _, barracksId in ipairs(BARRACKS_IDS) do
+        local barracks = GetBarracks(GetTeam(), barracksId)
+        if barracks == nil or not barracks:IsAlive() then return true end
+    end
+    return false
+end
 
 -- Any position, no exceptions: an enemy hero merely seen near the ancient or
 -- on our own high ground is enough to pull everyone home, even a core deep
@@ -129,8 +173,13 @@ function X.ShouldDefendBase(bot)
     if bot == nil or not bot:IsAlive() then return false end
     local ancient = GetAncient(GetTeam())
     if ancient == nil then return false end
-    return J.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 1
+    if J.Utils.CountEnemyHeroesOnHighGround(GetTeam()) >= 1
         or J.Utils.CountEnemyHeroesNear(ancient:GetLocation(), BASE_DEFEND_ANCIENT_RADIUS) >= 1
+    then
+        return true
+    end
+    return X.IsThroneExposed()
+        and J.Utils.CountEnemyHeroesNear(ancient:GetLocation(), BASE_EXPOSED_ANCIENT_RADIUS) >= 1
 end
 
 local function IsHealthyResponder(unit)
@@ -239,6 +288,19 @@ end
 function X.ShouldCoreTemporarilyJungle(bot, assignedLane)
     local position = J.GetPosition(bot)
     if position == nil or position > 3 or not EconomyPhase.IsActive() then return false end
+    -- mode_farm_generic.lua independently asks ShouldForceLaneCommitment
+    -- whether farm mode should stand down; if that already said "yes, get
+    -- back to the lane", laning mode must not ALSO defer to the jungle
+    -- here - that left both modes reporting NONE desire in the same tick,
+    -- for two different reasons, with no coordination between them. A
+    -- support/retreat/roam mode with only a modest baseline desire would
+    -- then win by default, which is what the observed river/jungle
+    -- back-and-forth actually was: two independent judgments occasionally
+    -- disagreeing, not a single bad decision repeating.
+    if X.ShouldForceLaneCommitment(bot) then
+        bot._ohaLaneRecoveryUntil = nil
+        return false
+    end
     if position == 2 then return X.ShouldMidTemporarilyJungle(bot, assignedLane) end
 
     local towerIds = { [LANE_TOP] = TOWER_TOP_1, [LANE_MID] = TOWER_MID_1, [LANE_BOT] = TOWER_BOT_1 }

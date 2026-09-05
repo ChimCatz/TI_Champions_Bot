@@ -324,8 +324,8 @@ local function EvaluateCombat(bot, lane)
     -- attention and leaving no time to last-hit; standing still and never
     -- fighting back unless attacked first was the opposite overcorrection.
     if DecisionPolicy.IsLaneLocked(bot) and not bot:WasRecentlyDamagedByAnyHero(2.5) then
-        if best.killRatio >= 1.5
-            and best.riskRatio <= 0.15
+        if best.killRatio >= 1.35
+            and best.riskRatio <= 0.20
             and best.enemies <= best.allies
             and not best.towerRisk
             and not TargetHasProtection(best.target)
@@ -334,9 +334,9 @@ local function EvaluateCombat(bot, lane)
             return best, 'KILL'
         end
         if not HasDyingCreep(bot)
-            and best.riskRatio <= 0.35
+            and best.riskRatio <= 0.45
             and best.enemies <= best.allies
-            and CountCreepsAttacking(bot) <= 1
+            and CountCreepsAttacking(bot) <= 2
             and not best.towerRisk
             and not TargetHasProtection(best.target)
             and GetUnitToUnitDistance(bot, best.target) <= bot:GetAttackRange() + 150
@@ -505,6 +505,7 @@ local function IsTaskSafe(bot, lane)
         or J.IsRetreating(bot)
         or bot:WasRecentlyDamagedByAnyHero(2.0)
         or #GetVisibleEnemies(bot:GetLocation(), TASK_DANGER_RADIUS) > 0
+        or DecisionPolicy.IsOwnTowerUnderSiege(bot)
     then
         return false
     end

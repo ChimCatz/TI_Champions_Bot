@@ -158,7 +158,7 @@ if FarmAbilityPolicy.TryCast(e)then return end;
 -- mode is active). Give farm mode the same reflex directly so it's the
 -- default regardless of which mode nominally "won" that tick.
 do
-    local waveClearTarget=CreepPolicy.FindSafeWaveClearTarget(e,e:GetNearbyLaneCreeps(1200,true) or {})
+    local waveClearTarget=CreepPolicy.FindSafeWaveClearTarget(e,e:GetNearbyLaneCreeps(1600,true) or {})
     if g.IsValid(waveClearTarget)then e:SetTarget(waveClearTarget)e:Action_AttackUnit(waveClearTarget,true)return end
 end;
 local b6={}for au=1,#GetTeamPlayers(GetTeam())do local av=GetTeamMember(au)if av~=nil and av~=e and av:IsAlive()then local S=av:GetActiveMode()if S==BOT_MODE_PUSH_TOWER_TOP or S==BOT_MODE_PUSH_TOWER_MID or S==BOT_MODE_PUSH_TOWER_BOT then if GetUnitToUnitDistance(e,av)<5000 then table.insert(b6,av)end end end end;

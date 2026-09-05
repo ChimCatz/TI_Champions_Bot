@@ -77,6 +77,39 @@ function X.SellObsoleteItems(bot)
     end
 end
 
+-- Any boots upgrade (Travels) strictly supersedes an earlier boots tier -
+-- there's no reason to keep both. The existing generic sell-pass only ran
+-- as a side effect of a full-backpack-near-shop cleanup, which could sit
+-- unfired for the rest of a match if the hero was never both full and near
+-- a shop at once (observed: Zeus holding Arcane Boots the whole game after
+-- getting Travels). This runs standalone since Dota allows selling from
+-- anywhere.
+local EARLY_BOOTS_TIERS = {
+    'item_boots', 'item_phase_boots', 'item_power_treads',
+    'item_tranquil_boots', 'item_arcane_boots',
+}
+
+function X.SellRedundantBoots(bot)
+    if bot == nil or not bot:IsAlive() then return end
+    local now = DotaTime()
+    if now < (bot._ticbBootsCheckAt or -90) then return end
+    bot._ticbBootsCheckAt = now + 5.0
+
+    local hasTravels = bot:FindItemSlot('item_travel_boots') >= 0
+        or bot:FindItemSlot('item_travel_boots_2') >= 0
+    if not hasTravels then return end
+
+    for _, itemName in ipairs(EARLY_BOOTS_TIERS) do
+        local slot = bot:FindItemSlot(itemName)
+        if slot >= 0 and slot <= 5 then
+            local item = bot:GetItemInSlot(slot)
+            if item ~= nil then
+                bot:ActionImmediate_SellItem(item)
+            end
+        end
+    end
+end
+
 function X.Optimize(bot)
     local now = DotaTime()
     if now < (bot._ticbInventoryCheckAt or -90) then return false end

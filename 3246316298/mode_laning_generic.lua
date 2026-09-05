@@ -34,7 +34,7 @@ if B>=0 and B<1000 and b.GetHP(A)<0.6 then return 0.1 end end;
 if b.Utils.IsTeamPushingSecondTierOrHighGround(e)then return BOT_MODE_DESIRE_NONE end;
 local laneTask=LaneTactics.GetTaskIntent(e,l)if laneTask~=nil then e.isInLanePhase=true;
 return laneTask.desire end;
-if g or b.GetPosition(e)==1 and b.IsPosxHuman(5)then if y<=18*60 then local C,D=GetBestLastHitCreep(i)if b.IsValid(C)then if not DecisionPolicy.ShouldYieldLaneCreeps(e,1200,C)then return 0.6 end end end end;
+if g or b.GetPosition(e)==1 and b.IsPosxHuman(5)or b.GetPosition(e)<=3 then if y<=18*60 then local C,D=GetBestLastHitCreep(i)if b.IsValid(C)then if not DecisionPolicy.ShouldYieldLaneCreeps(e,1200,C)then return 0.6 end end end end;
 if g and g.GetDesire~=nil then return g.GetDesire()end;
 if GetGameMode()==GAMEMODE_1V1MID or GetGameMode()==GAMEMODE_MO then return 1 end;
 local E={[LANE_TOP]=TOWER_TOP_2,[LANE_MID]=TOWER_MID_2,[LANE_BOT]=TOWER_BOT_2}local F=E[l]and GetTower(GetOpposingTeam(),E[l])if F==nil or not F:IsAlive()then return 0 end;

@@ -2,10 +2,9 @@
 
 ## Current Live Match
 
-- Match ID: `8980512953`
-- Live log: `E:\SteamLibrary\steamapps\common\dota 2 beta\game\dota\console.8980512953.log`
-- Current deployed version: `TI Champions Bot v0.6.2` (0.6.1 rune-compile hotfix confirmed
-  working in this match: TICB-DIAG x393, TICB-RUNE x423, zero compile errors)
+- Match ID: `8983174204` (5v5 bots-only, Radiant spectated, 2026/09/05, ~53 min)
+- Live log: `E:\SteamLibrary\steamapps\common\dota 2 beta\game\dota\console.8983174204.log`
+- Current deployed version: `TI Champions Bot v0.7.7` (see version history below)
 - The log is readable while the match is running. Dota initially writes to
   `console.log`, then changes to `console.<match-id>.log` after receiving the match ID.
 
@@ -119,6 +118,130 @@ configuration at `Config_Version = 6` or increment all matching copies together.
   supports 15:00.
 - Added backpack promotion for important usable items.
 - Rebranded logs/chat to TI Champions Bot and added `[TICB-*]` tags.
+
+### 0.7.7 - 15-item batch from bots-only spectated match (8983174204): rune pickup, mid aggression, lane-jungle contradiction, tower siege response, boots priority, ward tower engage, neutral actives, Aegis pickup, Ringmaster whip, throne-exposed defense, late-item builds
+
+All items below came from watching a full 5v5 bots-only match (~53 min) as
+Radiant spectator. Each was root-caused against the log/source before
+fixing; scope decisions were made per the user's explicit answers.
+
+1. **Bounty/Water rune false pickup timeout** (`rune_policy.lua`): log
+   showed Razor standing on top of a rune (`distance=1`) for the entire
+   2.25s retry window and still hitting `PICKUP_TIMEOUT` - `GetRuneStatus()`
+   never flipped off `AVAILABLE` in that window, and the existing
+   "resolved" signal check (rune type flips to -1 on pickup) only existed
+   in a different branch (the one taken when `FindImmediatePickup` returns
+   nil), not this hard-timeout branch. Applied the same resolved check
+   here before blacklisting a rune that was very likely already collected.
+2. **Mid too passive** (`lane_tactics.lua`, `mode_laning_generic.lua`):
+   tuned existing lane-locked KILL/HARASS thresholds looser (killRatio
+   1.5->1.35, riskRatio 0.15->0.20 for KILL; riskRatio 0.35->0.45,
+   CountCreepsAttacking <=1->2 for HARASS), and broadened the last-hit
+   priority desire override in `mode_laning_generic.lua` (previously gated
+   to `pos1 AND a human plays pos5`, a narrow one-off case) to all cores
+   (pos<=3) so a good last-hit isn't starved out just because the enemy
+   laner is standing nearby, which is the lane's normal state.
+3. **Pos1/mid still oscillating jungle/lane** (`decision_policy.lua`):
+   found two *independent* jungle-permission judgments that could disagree
+   in the same tick with no coordination - `mode_laning_generic.lua` asks
+   `ShouldCoreTemporarilyJungle` (self-suppress laning desire), while
+   `mode_farm_generic.lua` separately asks `ShouldForceLaneCommitment`
+   (suppress farm desire). When they disagreed, both modes could report
+   NONE simultaneously, letting some other mode with a modest baseline
+   desire win by default - the actual mechanism behind the "indecisive"
+   look. `ShouldCoreTemporarilyJungle` now short-circuits to false whenever
+   `ShouldForceLaneCommitment` already said "return to lane", so the two
+   can no longer contradict each other.
+4. **Safelane towers falling early / support+pos1 absent** (new
+   `DecisionPolicy.IsOwnTowerUnderSiege`): none of the existing jungle/task
+   safety checks asked "is *my own* T1 under attack right now" - they only
+   judged whether it was safe to *leave*. Wired as an immediate,
+   highest-priority trigger into `ShouldForceLaneCommitment` (cores) and
+   `lane_tactics.lua`'s `IsTaskSafe` (supports, interrupts an active
+   pull/stack) so both return home the instant their own tower is
+   contested, ahead of the wave-state exemption.
+5/6/7. **Boots missing/buried in builds** (Underlord, Ringmaster,
+   Earthshaker): not actually absent - e.g. Underlord's pos-3 list has
+   Travel Boots 6th, behind Crimson Guard/Halberd/Lotus/Shard/Gungir, so a
+   mid-game snapshot looks boot-less. Rather than hand-edit 128 hero files
+   (many mix literal item strings with dynamic `RandomInt`-picked
+   variables, too risky for a blind text pass), added a generic
+   `PrioritizeBoots()` pass in `item_purchase_generic.lua` that runs
+   wherever a hero's purchase list is (re)built and pulls the earliest
+   boots-tier entry up to the 2nd item bought (never 1st, to preserve each
+   hero's deliberate starting item).
+8. **Wards not attacking towers** (`attacking_wards.lua`): tower detection
+   was capped at the ward's own attack range (~500), with no fallback to
+   walk closer - a ward near-but-not-quite in range just idled. Detection
+   radius widened to `max(attackRange, 900)`; if a tower is found but not
+   yet in range, the ward now walks toward it instead of standing still.
+9. **Gris-Gris (and other simple neutral actives) never used**
+   (`ability_item_usage_generic.lua`): confirmed there was no handler for
+   `item_gris_gris` at all - or for most simple unit-targeted neutral
+   actives - so once picked up it permanently occupied a slot. Added a
+   `ConsiderItemDesire["item_gris_gris"]` entry modeled on the existing
+   `item_urn_of_shadows` pattern: casts on a valid enemy target when going
+   aggressive (offense) or when being chased while retreating (defense).
+10. **Side lane waves disregarded**: the reactive wave-clear hook already
+    added in 0.7.5 (`CreepPolicy.FindSafeWaveClearTarget`) is lane-agnostic
+    (works on whatever lane creeps are nearby, own lane or not) - the gap
+    was just that a farming core rarely got physically close enough to a
+    side lane to trigger it. Per the user's "opportunistic only" choice
+    (no new routing/split-push decision system), widened the detection
+    radius in `mode_farm_generic.lua` from 1200 to 1600 so a core farming
+    near a side lane is more likely to notice and clear a free wave in
+    passing.
+11. **Redundant boots** (Zeus keeping Arcane after Travels, general
+    pattern): the existing sell-on-travel-boots logic only ran as a side
+    effect of a full-backpack-near-shop cleanup pass, which could go
+    unfired for an entire match if the hero was never both full and near a
+    shop at once. Added `InventoryPolicy.SellRedundantBoots` - a standalone
+    check (Dota allows selling from anywhere) that sells any earlier boots
+    tier still held once Travel Boots (either level) are acquired, for all
+    heroes.
+12. **Aghanim's Blessing / Moon Shard / Travel Boots 2 missing from
+    builds**: audited all 128 hero files - Moon Shard was already in 126/128
+    and Travel Boots 2 in 101/102 of the heroes that build base Travels, so
+    those two were nearly complete already. Aghanim's Blessing was in 0/128.
+    Wrote a scripted pass (same real-`lua.exe` technique as the 0.7.6 item
+    audit) that appends, per buy-list array: Aghanim's Blessing as the last
+    item to any list that already builds Aghanim's Scepter (261 arrays
+    across 86 files), Moon Shard to the few lists missing it, and Travel
+    Boots 2 to lists that already build base Travel Boots but not the
+    upgrade (skipped entirely for heroes that don't build Travels at all,
+    per the user's instruction). Verified with a full `luac -p` pass on all
+    128 files afterward and a manual diff spot-check.
+13. **No Aegis pickup after Roshan** (`mode_roshan_generic.lua`): this
+    mode's own desire collapses to NONE the instant `IsRoshanAlive()` flips
+    false, and the only dropped-item pickup logic elsewhere
+    (`item_purchase_generic.lua`) explicitly filters to items *the bot
+    itself* dropped - nothing anywhere ever went to claim Roshan's aegis.
+    Added a `FindDroppedAegis` check (scans `GetDroppedItemList()` near the
+    current Roshan pit) that keeps this mode's desire at VERYHIGH and
+    routes `Think()` to walk to and pick up an unclaimed aegis until
+    someone gets it.
+14. **Ringmaster cancelling autoattacks while farming**: found he already
+    has a full custom ability script embedded in `BotsLib/hero_ringmaster.lua`
+    (like other heroes) - not missing one, as first assumed when asking the
+    user about this. The actual bug: `TameTheBeastsCrack` (his whip, which
+    a `b.whip_to_farm` state flag confirms is also used for clearing
+    waves) fired via immediate `Action_UseAbility`, which interrupts an
+    in-progress attack windup - unlike sibling abilities in the same
+    function (`WheelOfWonder`, `TameTheBeasts`, etc.) that correctly use
+    the queued `ActionQueue_UseAbility*` form. Fixed by queuing the cast
+    specifically when `b.whip_to_farm` is the reason (kill/engage/retreat/
+    push/defend/miniboss/aoe_kill casts stay immediate, since those
+    genuinely need instant response).
+15. **Passive defense with throne exposed** (`decision_policy.lua`): added
+    `X.IsThroneExposed()` (true once any barracks has fallen) and used it to
+    widen `ShouldDefendBase`'s ancient-defense radius from 4000 to 5500 once
+    true, so farm/roam desire is suppressed proactively for anyone in that
+    wider radius rather than only once an enemy is already right on the
+    ancient.
+
+Validated: full-workspace `luac -p` (321 files, all pass) both mid-session
+and again after the bulk 128-file item-build pass. Deployed via
+SHA-256-verified copy to both the Workshop folder and the release folder.
 
 ### 0.7.6 - Fixed cosmetic-placeholder items contaminating 83 of 128 hero buy lists (major), fixed obsolete-item-sell trigger
 

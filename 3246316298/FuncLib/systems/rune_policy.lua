@@ -240,6 +240,28 @@ function X.TryImmediatePickup(bot, radius)
     end
 
     if now - attempt.started >= PICKUP_RETRY_SECONDS then
+        -- FindImmediatePickup can keep reporting the same rune as
+        -- collectible for the whole retry window even after it was
+        -- actually picked up - GetRuneStatus() staying stuck at AVAILABLE
+        -- (not just lagging one tick, as the nil-rune branch above already
+        -- accounts for) was observed standing distance=1 on top of the
+        -- rune the entire window and still hitting this hard timeout,
+        -- which then blacklisted an already-collected rune for 55s and
+        -- logged a false failure. Apply the same resolved-signal check
+        -- here before giving up.
+        local resolved = attempt.orders > 0
+            and distance <= 425
+            and (GetRuneStatus(rune) ~= RUNE_STATUS_AVAILABLE
+                or (GetRuneType(rune) or -1) < 0)
+        if resolved then
+            RuneLog(bot, 'PICKUP_RESOLVED', rune, distance)
+            bot._ohaRunePickupAttempt = nil
+            bot._ohaRuneCommitRune = nil
+            bot._ohaRuneCommitUntil = -90
+            bot._ohaRuneHardPickupUntil = -90
+            bot._ohaRunePickupUntil = -90
+            return false
+        end
         bot._ohaRuneFailed = {
             rune = rune,
             untilTime = now + FAILED_RUNE_SUPPRESSION,
