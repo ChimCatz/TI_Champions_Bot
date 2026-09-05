@@ -14,10 +14,10 @@ local EXPECTED_LANE = {
 local LANE_NAMES = { [LANE_TOP] = 'TOP', [LANE_MID] = 'MID', [LANE_BOT] = 'BOT' }
 
 -- One-time self-check, run right alongside the existing TICB-ITEM line so a
--- position/hero-suitability or position/lane mismatch (the Jakiro-as-Pos1
--- class of bug fixed in 0.7.0) is immediately visible in the log again if
--- it ever regresses, instead of requiring another multi-match investigation.
-local function ValidateAssignment(bot, position, team)
+-- position/hero-suitability mismatch (the Jakiro-as-Pos1 class of bug fixed
+-- in 0.7.0) is immediately visible in the log again if it ever regresses,
+-- instead of requiring another multi-match investigation.
+local function ValidatePositionWeight(bot, position)
     local weights = HeroPosWeights.GetHeroPositions()[bot:GetUnitName()]
     if weights ~= nil and (weights[position] or 0) <= 5 then
         pcall(function()
@@ -27,7 +27,13 @@ local function ValidateAssignment(bot, position, team)
                 weights[1] or 0, weights[2] or 0, weights[3] or 0, weights[4] or 0, weights[5] or 0))
         end)
     end
+end
 
+-- Lane isn't resolved yet at ConfigurePurchaseList time (bot:GetAssignedLane()
+-- reliably still reports 0 there), so this check is deferred and called once
+-- from decision_log.lua's first Heartbeat per bot instead, by which point
+-- lane assignment has settled.
+function X.ValidateLane(bot, position, team)
     local expected = EXPECTED_LANE[team] and EXPECTED_LANE[team][position]
     local okLane, actualLane = pcall(function() return bot:GetAssignedLane() end)
     if expected ~= nil and okLane and actualLane ~= expected then
@@ -112,7 +118,7 @@ function X.ConfigurePurchaseList(bot, purchaseList)
             team == TEAM_RADIANT and 'Radiant' or 'Dire', bot:GetUnitName(), position,
             (okLane and LANE_NAMES[lane]) or '?', tostring(target), DEADLINES[position] or 0))
     end)
-    ValidateAssignment(bot, position, team)
+    ValidatePositionWeight(bot, position)
 end
 
 function X.GetState(bot)

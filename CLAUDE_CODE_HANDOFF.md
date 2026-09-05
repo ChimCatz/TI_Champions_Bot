@@ -120,6 +120,26 @@ configuration at `Config_Version = 6` or increment all matching copies together.
 - Added backpack promotion for important usable items.
 - Rebranded logs/chat to TI Champions Bot and added `[TICB-*]` tags.
 
+### 0.7.2 - Fix false-positive lane validation warnings (match 8983037341, 38 min)
+
+0.7.1's new lane-validation check fired at `ConfigurePurchaseList` time, but
+`bot:GetAssignedLane()` reliably still reports `0` (unresolved) at that
+point in the pregame sequence - every single hero in this match's log threw
+a `[TICB-VALIDATE][WARNING] ... assigned lane=0` false positive, and
+`TICB-ITEM` itself printed `lane=?` for the same reason. Split the check:
+`ValidatePositionWeight` (doesn't depend on lane) still runs immediately;
+`ValidateLane` is now deferred to the first `Heartbeat` call per bot
+(`decision_log.lua`), by which point lane assignment has settled. Position-
+weight validation itself found nothing wrong this match - every hero's
+label matched its weight table, consistent with 0.7.0's fix holding up.
+
+This round is otherwise a large findings-and-questions pass on 7 new
+observations from the match (naming, Pos 1 core farm/lane indecision, rune
+pickup stall, tower-defense passivity, vision/fog-of-war, push priority,
+creep-wave-based farm/lane decisioning) - see conversation log for the full
+writeup; no further code changes made pending the user's answers to avoid
+a large speculative rewrite of the farm/lane/defend systems.
+
 ### 0.7.1 - Proactive audit: self-validating position/lane logging, hero-pool distribution check, recursion safety cap
 
 No new match yet (this round was requested before the next test) - a

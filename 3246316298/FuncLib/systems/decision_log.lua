@@ -1,5 +1,6 @@
 local Customize = require(GetScriptDirectory() .. '/FuncLib/systems/custom_loader')
 local J = require(GetScriptDirectory() .. '/FuncLib/func_utils')
+local FarmTiming = require(GetScriptDirectory() .. '/FuncLib/systems/farm_timing')
 
 local X = {}
 local enabled = Customize.Enable ~= false and Customize.Laning_Diagnostics == true
@@ -88,12 +89,24 @@ end
 -- LANE_STATE/LANE_RECOVERY throttle above) so a full match has a
 -- position/status trail even for bots that never trigger another category -
 -- requested so match reviews don't need extra explanation of who was where.
+local laneValidated = {}
+
 function X.Heartbeat(bot)
     if not enabled or bot == nil then return end
     local key = BotKey(bot)
     local now = DotaTime()
     if now < (heartbeatLast[key] or -1e9) + HEARTBEAT_INTERVAL then return end
     heartbeatLast[key] = now
+    -- Position/weight is validated immediately at pick time (farm_timing.lua),
+    -- but GetAssignedLane() isn't resolved yet then - it reliably is by this
+    -- point, so the lane half of that same check runs here instead, once.
+    if not laneValidated[key] then
+        laneValidated[key] = true
+        local okPos, position = pcall(J.GetPosition, bot)
+        if okPos and position ~= nil then
+            FarmTiming.ValidateLane(bot, position, bot:GetTeam())
+        end
+    end
     local okHp, hpPct = pcall(function() return 100 * bot:GetHealth() / math.max(1, bot:GetMaxHealth()) end)
     local okMp, mpPct = pcall(function() return 100 * bot:GetMana() / math.max(1, bot:GetMaxMana()) end)
     local okLvl, level = pcall(function() return bot:GetLevel() end)
