@@ -22,6 +22,32 @@ local PICKUP_RETRY_SECONDS = 2.25
 local PICKUP_ORDER_INTERVAL = 0.15
 local FAILED_RUNE_SUPPRESSION = 55
 
+-- BOT_ACTION_TYPE_*/BOT_MODE_* numeric values aren't documented anywhere in
+-- this codebase and have shifted across Dota versions - resolve against the
+-- live globals (same technique as decision_log.lua's ModeName) instead of a
+-- hardcoded/guessed table, so a stuck-pickup investigation doesn't first
+-- require guessing what the numbers even mean.
+local actionTypeNameByValue = nil
+local function ActionTypeName(actionType)
+    if actionTypeNameByValue == nil then
+        actionTypeNameByValue = {}
+        local names = {
+            'BOT_ACTION_TYPE_IDLE', 'BOT_ACTION_TYPE_MOVE_TO', 'BOT_ACTION_TYPE_MOVE_TO_DIRECTLY',
+            'BOT_ACTION_TYPE_ATTACK', 'BOT_ACTION_TYPE_ATTACKMOVE', 'BOT_ACTION_TYPE_ATTACKMOVE_TO_UNIT',
+            'BOT_ACTION_TYPE_USE_ABILITY', 'BOT_ACTION_TYPE_PICK_UP_RUNE', 'BOT_ACTION_TYPE_PICK_UP_ITEM',
+            'BOT_ACTION_TYPE_DROP_ITEM', 'BOT_ACTION_TYPE_SHRINE', 'BOT_ACTION_TYPE_DELAY',
+            'BOT_ACTION_TYPE_CLEAR', 'BOT_ACTION_TYPE_BUYBACK', 'BOT_ACTION_TYPE_TRAIN_ABILITY',
+            'BOT_ACTION_TYPE_ATTACK_LOCATION', 'BOT_ACTION_TYPE_PICK_UP_TOME', 'BOT_ACTION_TYPE_SUICIDE',
+            'BOT_ACTION_TYPE_HOLD_POSITION', 'BOT_ACTION_TYPE_CHANNEL_ABILITY',
+        }
+        for _, name in ipairs(names) do
+            local ok, value = pcall(function() return _G[name] end)
+            if ok and value ~= nil then actionTypeNameByValue[value] = name:gsub('^BOT_ACTION_TYPE_', '') end
+        end
+    end
+    return actionTypeNameByValue[actionType] or tostring(actionType)
+end
+
 local function RuneLog(bot, event, rune, distance)
     local now = DotaTime()
     if event == 'TRY' and now < (bot._ohaRuneLastLog or -90) + 0.5 then return end
@@ -30,10 +56,14 @@ local function RuneLog(bot, event, rune, distance)
         local team = bot:GetTeam() == TEAM_RADIANT and 'Radiant' or 'Dire'
         local location = bot:GetLocation()
         local loc = location ~= nil and string.format('(%.0f,%.0f)', location.x, location.y) or '(?,?)'
-        print(string.format('[TICB-RUNE] %s team=%s pos=%s hero=%s loc=%s rune=%s type=%s status=%s distance=%.0f action=%s queued=%s',
+        local runeLocation = GetRuneSpawnLocation(rune)
+        local okPassable, passable = pcall(IsLocationPassable, runeLocation)
+        print(string.format('[TICB-RUNE] %s team=%s pos=%s hero=%s loc=%s rune=%s type=%s status=%s distance=%.0f action=%s queued=%s mode=%s passable=%s',
             event, team, tostring(J.GetPosition(bot)), bot:GetUnitName(), loc, tostring(rune), tostring(GetRuneType(rune)),
             tostring(GetRuneStatus(rune)), distance or -1,
-            tostring(bot:GetCurrentActionType()), tostring(bot:NumQueuedActions())))
+            ActionTypeName(bot:GetCurrentActionType()), tostring(bot:NumQueuedActions()),
+            tostring(bot:GetActiveMode()),
+            tostring(okPassable and passable or '?')))
     end)
 end
 

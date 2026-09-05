@@ -46,6 +46,39 @@ end
 
 local LANE_COMMIT_HOLD_SECONDS = 18
 
+local WAVE_SAFE_TOWER_RADIUS = 1000
+local WAVE_SAFE_HERO_RADIUS = 1400
+local WAVE_SAFE_MAX_BOT_DISTANCE = 2200
+local LANE_TOWER_IDS = { [LANE_TOP] = TOWER_TOP_1, [LANE_MID] = TOWER_MID_1, [LANE_BOT] = TOWER_BOT_1 }
+
+-- Explicit request: a raw distance leash was the wrong signal for "is it
+-- safe to leave the lane and farm a nearby camp" - it flickers tick to tick
+-- with no regard for what's actually happening in the lane. This checks the
+-- thing that actually matters: is the wave parked at/under the enemy tower
+-- with a hero (either side) there holding it? If so, a locked core doesn't
+-- need to be glued to the wave - the tower and whoever's home will hold it.
+-- Deliberately cores-only (pos<=3, enforced by the IsLaneLocked call at the
+-- one call site) - supports keep their existing pull/stack/harass logic.
+function X.IsSafeToJungleNearLane(bot)
+    local lane = bot:GetAssignedLane()
+    local enemyTowerId = lane ~= nil and LANE_TOWER_IDS[lane]
+    if enemyTowerId == nil then return false end
+    local enemyTower = GetTower(GetOpposingTeam(), enemyTowerId)
+    if enemyTower == nil or not enemyTower:IsAlive() then return false end
+    if GetUnitToLocationDistance(bot, enemyTower:GetLocation()) > WAVE_SAFE_MAX_BOT_DISTANCE then
+        return false
+    end
+
+    local allyWaveNear = #(bot:GetNearbyLaneCreeps(WAVE_SAFE_TOWER_RADIUS, false) or {}) > 0
+    local enemyWaveNear = #(bot:GetNearbyLaneCreeps(WAVE_SAFE_TOWER_RADIUS, true) or {}) > 0
+    if not allyWaveNear or not enemyWaveNear then return false end
+
+    local towerLocation = enemyTower:GetLocation()
+    local heroPresent = #(J.GetEnemiesNearLoc(towerLocation, WAVE_SAFE_HERO_RADIUS) or {}) > 0
+        or #(J.GetAlliesNearLoc(towerLocation, WAVE_SAFE_HERO_RADIUS) or {}) > 0
+    return heroPresent
+end
+
 -- LaneDiscipline.ShouldReturnToLane can flip true/false tick to tick right
 -- around its distance threshold, which - combined with farm mode re-earning
 -- an ABSOLUTE camp desire the instant this drops false - produced visible
@@ -56,8 +89,24 @@ local LANE_COMMIT_HOLD_SECONDS = 18
 function X.ShouldForceLaneCommitment(bot)
     if not X.IsLaneLocked(bot) then
         bot._ohaLaneCommitUntil = nil
+        bot._ohaWasJungleExempt = nil
         return false
     end
+
+    if X.IsSafeToJungleNearLane(bot) then
+        bot._ohaLaneCommitUntil = nil
+        bot._ohaWasJungleExempt = true
+        return false
+    end
+
+    if bot._ohaWasJungleExempt then
+        -- The wave-safe exception just ended - return to lane immediately,
+        -- no grace period, regardless of what the distance check below
+        -- would otherwise tolerate.
+        bot._ohaWasJungleExempt = false
+        return true
+    end
+
     local now = DotaTime()
     if LaneDiscipline.ShouldReturnToLane(bot) then
         bot._ohaLaneCommitUntil = now + LANE_COMMIT_HOLD_SECONDS

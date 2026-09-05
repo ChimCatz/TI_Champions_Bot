@@ -120,6 +120,52 @@ configuration at `Config_Version = 6` or increment all matching copies together.
 - Added backpack promotion for important usable items.
 - Rebranded logs/chat to TI Champions Bot and added `[TICB-*]` tags.
 
+### 0.7.3 - Creep-wave-gated farm exception for cores, rune-stall diagnostics
+
+Follow-up to the 0.7.2 findings-and-questions round on match 8983037341.
+Per the user's explicit design choices (asked via AskUserQuestion):
+
+- **Creep-wave farm gate** (`decision_policy.lua`, `X.IsSafeToJungleNearLane`):
+  replaces "was the raw distance to lane front the right signal for
+  farm-vs-lane" with the thing the user actually pointed at - a locked core
+  (Pos 1-3 only, supports untouched) may now leave its wave to farm nearby
+  camps ONLY while (a) it's within 2200 units of the lane's enemy T1 tower,
+  (b) both an allied AND an enemy lane creep are near it (the wave is
+  genuinely parked there, not just "somewhere"), and (c) at least one hero
+  (either side) is within 1400 units of that tower to hold the wave. The
+  moment any of that stops being true, `ShouldForceLaneCommitment` forces an
+  immediate return with no grace period (tracked via a one-shot
+  `_ohaWasJungleExempt` flag) - explicitly chosen over holding the exemption
+  or finishing the current camp. This directly targets the Gyrocopter/
+  Alchemist jungle-oscillation pattern: the old distance leash flickered
+  tick-to-tick with no regard for what the lane itself was doing; this gate
+  only opens when the wave's position already justifies it, which is a far
+  more stable signal. The pre-existing distance/hysteresis logic
+  (`LaneDiscipline.ShouldReturnToLane` + 0.7.0's 18s hold) remains as the
+  fallback for the default "come back, nothing justifies where you are"
+  case - this is additive, not a replacement of that system.
+- **Rune-pickup stall diagnostics** (`rune_policy.lua`): investigated the
+  Witch Doctor bounty-rune stall (confirmed via log: closed to 56 units,
+  still `PICKUP_TIMEOUT`'d) but per the user's choice, added diagnostics
+  before attempting a fix rather than guessing. `TICB-RUNE` lines now also
+  include the bot's current action type (resolved by name via live
+  `BOT_ACTION_TYPE_*` globals, not a guessed number), active mode, and
+  whether the rune's location is currently pathable - enough to tell next
+  time whether it's a stuck order, a competing mode overriding the pickup,
+  or something else.
+- **Explicitly deferred, not forgotten**: the Alchemist-naming cosmetic
+  issue (engine-level race on the first-created bot slot, always Pos 1,
+  doesn't affect gameplay - user chose to deprioritize); the vision/
+  fog-of-war finding (350+ call sites use an omniscient `GetEnemiesNearLoc`
+  vs. 19 using the vision-respecting `GetLastSeenEnemiesNearLoc` - user
+  chose to leave as-is for now, treating it as inherited "danger-sense"
+  rather than a bug); and the push-priority/base-race feature (item 6 from
+  the user's list) - a distinct, sizably-scoped new feature not yet
+  designed or built.
+- Validated: `luac -p` individually and full-workspace loop, both clean.
+  Deployed via SHA-256-verified copy to Workshop folder and release folder.
+  Not yet verified in a live match.
+
 ### 0.7.2 - Fix false-positive lane validation warnings (match 8983037341, 38 min)
 
 0.7.1's new lane-validation check fired at `ConfigurePurchaseList` time, but
