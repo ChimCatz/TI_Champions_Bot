@@ -2,6 +2,7 @@ local X = {}
 
 local Customize = require(GetScriptDirectory() .. '/FuncLib/systems/custom_loader')
 local ObjectivePolicy = require(GetScriptDirectory() .. '/FuncLib/systems/objective_policy')
+local DecisionPolicy = require(GetScriptDirectory() .. '/FuncLib/systems/decision_policy')
 
 local CACHE_TTL = 0.25
 local TOWER_MOMENTUM_SECONDS = 20
@@ -190,7 +191,20 @@ local function UpdateState()
     local minAllies = tonumber(Customize.Decisive_Push_Min_Allies) or 1
     if state.allyAlive < minAllies then return state end
 
-    state.decisive = state.enemyAlive == 0
+    -- state.enemyAlive==0 is meant to mean "the whole enemy team just got
+    -- wiped" (a real, decisive push signal), but IsHeroAlive() also
+    -- legitimately returns false for a hero that simply hasn't spawned
+    -- into the world yet. Right at game start, before all 5 heroes have
+    -- finished spawning, this made CountAlive(enemyTeam) read 0 for a
+    -- moment - a false "enemy wiped" reading with no minute/level gate
+    -- (the minMinute check below only applies to the OTHER, "hasNumbers"
+    -- branch) - and pulled a level-1 safelane carry off to push mid within
+    -- the first minute of the match while their own lane sat empty. Guard
+    -- the decisive-wipe branch with the same minimum-minute floor so it
+    -- can never fire before the game has genuinely been running long
+    -- enough for a real teamfight to have happened.
+    local pastStartupWindow = DotaTime() >= 60
+    state.decisive = pastStartupWindow and state.enemyAlive == 0
     if state.decisive then
         state.active = true
         state.lane = SelectLane(enemyTeam, true, now)
@@ -221,6 +235,13 @@ function X.ShouldSuppressFarm() return UpdateState().active end
 function X.ShouldSuppressSideObjectives() return UpdateState().decisive end
 
 function X.GetPushDesire(bot, lane)
+    -- No committed push, however decisive it looked a moment ago, is worth
+    -- more than the enemy already being on our own base (item 20: creeps
+    -- hitting the throne while everyone kept pushing mid "like nothing
+    -- happened"). Bail out to nil so mode_push_tower_*'s desire falls
+    -- through to Push.GetPushDesire, which carries the same base-defend
+    -- check and will stand down too.
+    if DecisionPolicy.ShouldDefendBase(bot) then return nil end
     local current = UpdateState()
     if not current.active then return nil end
     if lane ~= current.lane then return BOT_MODE_DESIRE_NONE end

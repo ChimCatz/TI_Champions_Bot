@@ -7,6 +7,7 @@ local ObjectivePolicy=require(GetScriptDirectory()..'/FuncLib/systems/objective_
 local FarmTiming=require(GetScriptDirectory()..'/FuncLib/systems/farm_timing')
 local FarmAbilityPolicy=require(GetScriptDirectory()..'/FuncLib/systems/farm_ability_policy')
 local Diagnostics=require(GetScriptDirectory()..'/FuncLib/systems/decision_log')
+local EconomyBoost=require(GetScriptDirectory()..'/FuncLib/systems/economy_boost')
 local CreepPolicy=require(GetScriptDirectory()..'/FuncLib/systems/creep_policy')
 local l=nil;
 local m=0;
@@ -35,6 +36,8 @@ function f.GetModeLocaleKey(S)return R[S]or'mode_other'end;
 if e.farmLocation==nil then e.farmLocation=e:GetLocation()end;
 function GetDesire()if ShouldSkipBotThink(GetBot())then return 0 end;
 Diagnostics.Heartbeat(e)
+local _ebOk,_ebErr=pcall(EconomyBoost.Think,e)
+if not _ebOk then print('[TICB-ECONOMY][ERROR] '..tostring(_ebErr))end
 if e.isBear or string.find(e:GetUnitName(),'lone_druid_bear')then local T=e:HasModifier('modifier_item_ultimate_scepter_consumed')or e:FindItemSlot('item_ultimate_scepter')>=0;
 if not T then local a=require(GetScriptDirectory()..'/FuncLib/systems/utils')local U=a.GetLoneDruid(e)if U and U.hero and g.IsValidHero(U.hero)and U.hero:IsAlive()then if U.hero:GetActiveMode()==BOT_MODE_FARM then return U.hero:GetActiveModeDesire()+0.05 end end end end;
 local V,W=pcall(GetDesireHelper)if not V then if IsDebug then log('[FARM-ERROR] %s %s',e:GetUnitName(),tostring(W))end;

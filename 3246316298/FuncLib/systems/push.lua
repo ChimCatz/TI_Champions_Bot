@@ -17,6 +17,7 @@ local W=P.Tower;
 local X=P.UnitType;
 local Y=require(GetScriptDirectory().."/FuncLib/systems/utils")local Z=Y.IsValidUnit;
 local _=Y.GetLocationToLocationDistance;
+local DecisionPolicy=require(GetScriptDirectory().."/FuncLib/systems/decision_policy")
 local a0=Y.RadiantFountainTpPoint;
 local a1=Y.DireFountainTpPoint;
 local a2=require(GetScriptDirectory().."/FuncLib/systems/cache")local a3=a2.getGlobalGameState;
@@ -212,6 +213,7 @@ local cD=0.5;
 local cE=1.8;
 M=2200;
 local cF={}function l.GetPushDesire(ao,ap)if ao:IsInvulnerable()or not ao:IsHero()or not ao:IsAlive()or not g(ao:GetUnitName(),"hero")or ao:IsIllusion()then return S.None end;
+if DecisionPolicy.ShouldDefendBase(ao)then return S.None end;
 if ao:GetLevel()<6 then return S.None end;
 local cG=math.min(l.GetPushDesireHelper(ao,ap),1)ao.pushDesire=cG;
 return cG end;
@@ -264,7 +266,7 @@ local d7=ao:GetNearbyLaneCreeps(1600,false)if d7 and#d7>=1 then local d8=d7[#d7]
 if d6._fountainRetreatUntil and DotaTime()<=d6._fountainRetreatUntil then if ao:WasRecentlyDamagedByAnyHero(1)then elseif d6._fountainRetreatLoc and GetUnitToLocationDistance(ao,d6._fountainRetreatLoc)>300 then ao:Action_MoveToLocation(d6._fountainRetreatLoc)return else d6._fountainRetreatUntil=0 end end;
 do local aD=GetLaneFrontLocation(GetTeam(),ap,0)local d9=GetUnitToLocationDistance(ao,aD)if d9>2000 and not ao:WasRecentlyDamagedByAnyHero(3)then ao:Action_MoveToLocation(aD)return end end;
 a7()local ad=a3()local aq=a4()local da=ct(ao)local db=da.location;
-local aA=a5(db,1600)local aB=a6(db,1600)local dc=da.attackRange;
+local aA=a5(db,1200)local aB=a6(db,1200)local dc=da.attackRange;
 local dd=da.hp;
 local de=math.min(dd,0.7)*1000-700+RemapValClamped(dc,300,700,0,-600)local df=da.nearbyTowers;
 local dg=da.nearbyLaneCreeps;
@@ -306,7 +308,24 @@ local dE=da.nearbyCreeps;
 local dF=aa.PUSH_SPECIAL_CREEPS+ao:GetPlayerID()local dG=O.Utils.GetCachedVars(dF,0.2)if dG then dE=dG else dE=l.GetSpecialUnitsNearby(ao,dE,dD)O.Utils.SetCachedVars(dF,dE)end;
 local dH=aq.teamFountain;
 local dI=O.IsValidBuilding(df[1])local dJ=dI and GetUnitToLocationDistance(df[1],dH)or 0;
-do local towerTarget=ao._ticbTowerCommitTarget;local now=DotaTime();if towerTarget==nil or not O.IsValidBuilding(towerTarget)or now>=(ao._ticbTowerCommitUntil or-90)then towerTarget=cX(ao,ap,cu)end;local killOpportunity=false;local nearbyEnemies=ao:GetNearbyHeroes(math.min(1200,dc+350),true,R.None)or{}for af,enemy in ipairs(nearbyEnemies)do if O.IsValidHero(enemy)and O.CanBeAttacked(enemy)and not O.IsSuspiciousIllusion(enemy)then local ok,damage=pcall(function()return ao:GetEstimatedDamageToTarget(true,enemy,2.5,T.All)end)if ok and damage~=nil and damage>=enemy:GetHealth()+enemy:GetHealthRegen()*2.5 then killOpportunity=true;break end end end;local safeCommit=towerTarget~=nil and O.IsValidBuilding(towerTarget)and towerTarget:IsTower()and O.CanBeAttacked(towerTarget)and not l.HasBackdoorProtect(towerTarget)and dd>=0.38 and#aA>=#aB and not killOpportunity;local towerAttackTarget=safeCommit and towerTarget:GetAttackTarget()or nil;local creepCover=safeCommit and towerTarget:GetNearbyLaneCreeps(850,true)or{};local creepTanking=O.IsValid(towerAttackTarget)and towerAttackTarget:IsCreep()and towerAttackTarget:GetTeam()==GetTeam();if safeCommit and#creepCover>=3 and creepTanking then if ao._ticbTowerCommitTarget~=towerTarget then Diagnostics.Write(ao,'TOWER_COMMIT','target=%s creeps=%d duration=2.5',towerTarget:GetUnitName(),#creepCover)end;ao._ticbTowerCommitTarget=towerTarget;ao._ticbTowerCommitUntil=now+2.5;if O.IsInRange(ao,towerTarget,dc+150)then ao:Action_AttackUnit(towerTarget,true)else ao:Action_MoveToLocation(O.AdjustLocationWithOffsetTowardsFountain(towerTarget:GetLocation(),dc))end;return else ao._ticbTowerCommitTarget=nil;ao._ticbTowerCommitUntil=-90 end end;
+do local towerTarget=ao._ticbTowerCommitTarget;local now=DotaTime();if towerTarget==nil or not O.IsValidBuilding(towerTarget)or now>=(ao._ticbTowerCommitUntil or-90)then towerTarget=cX(ao,ap,cu)end;local killOpportunity=false;local nearbyEnemies=ao:GetNearbyHeroes(math.min(1200,dc+350),true,R.None)or{}for af,enemy in ipairs(nearbyEnemies)do if O.IsValidHero(enemy)and O.CanBeAttacked(enemy)and not O.IsSuspiciousIllusion(enemy)then local ok,damage=pcall(function()return ao:GetEstimatedDamageToTarget(true,enemy,2.5,T.All)end)if ok and damage~=nil and damage>=enemy:GetHealth()+enemy:GetHealthRegen()*2.5 then killOpportunity=true;break end end end;local safeCommit=towerTarget~=nil and O.IsValidBuilding(towerTarget)and towerTarget:IsTower()and O.CanBeAttacked(towerTarget)and not l.HasBackdoorProtect(towerTarget)and dd>=0.38 and#aA>=#aB and not killOpportunity;local towerAttackTarget=safeCommit and towerTarget:GetAttackTarget()or nil;local creepCover=safeCommit and towerTarget:GetNearbyLaneCreeps(850,true)or{};local creepTanking=O.IsValid(towerAttackTarget)and towerAttackTarget:IsCreep()and towerAttackTarget:GetTeam()==GetTeam();
+-- Requiring 3+ creeps AND the tower already mid-attacking one of them was
+-- meant as a "safe to tank-and-hit" optimization, but it also blocked the
+-- routine, genuinely safe case (no enemy heroes around, tower not
+-- currently attacking anything, or fewer than 3 creeps nearby) - a hero
+-- would just stand there while a T1/T2 tower slowly died to creep damage
+-- on its own instead of ever hitting it. safeCommit above already
+-- requires ally count >= enemy count and no live kill opportunity being
+-- missed, so it alone is enough permission to commit.
+-- Further loosened per live report (24min: Outworld Destroyer/Slardar/
+-- Phantom Lancer + creeps all attacking a tower, bots just standing back):
+-- requiring creepTanking meant the tower had to ALREADY be mid-attacking a
+-- creep before a hero would join in, which is a chicken-and-egg stall the
+-- moment a fresh wave arrives - nothing ever tanked first because nothing
+-- ever committed first. Dropped that requirement and lowered the creep
+-- threshold from 3 to 2, matching "2+ creeps and no immediate threats in
+-- vision -> go ahead".
+if safeCommit and(#creepCover>=2 or#nearbyEnemies==0)then if ao._ticbTowerCommitTarget~=towerTarget then Diagnostics.Write(ao,'TOWER_COMMIT','target=%s creeps=%d duration=2.5',towerTarget:GetUnitName(),#creepCover)end;ao._ticbTowerCommitTarget=towerTarget;ao._ticbTowerCommitUntil=now+2.5;if O.IsInRange(ao,towerTarget,dc+150)then ao:Action_AttackUnit(towerTarget,true)else ao:Action_MoveToLocation(O.AdjustLocationWithOffsetTowardsFountain(towerTarget:GetLocation(),dc))end;return else ao._ticbTowerCommitTarget=nil;ao._ticbTowerCommitUntil=-90 end end;
 do local dt=ao:GetNearbyHeroes(1200,true,R.None)or{}if#dt>0 and#aA>=#dt then local dK=nil;
 local dL=999999;
 for af,az in ipairs(dt)do if O.IsValidHero(az)and O.CanBeAttacked(az)and not O.IsSuspiciousIllusion(az)then local bn=az:GetHealth()if bn<dL then dL=bn;

@@ -1,0 +1,20 @@
+Carry (Position 1)
+Standard sustain: Tango, Quelling Blade, Iron Branch x2, Circlet
+Stats-into-Wraith Band: 2x Iron Branch, Circlet, Slippers of Agility (builds into Wraith Band turn 1)
+Farming-tool rush: Quelling Blade, Gauntlets of Strength or Slippers, Tango, Healing Salve (for lane-bully carries like Naga, Ursa)
+Mid
+Bottle standard: Bottle, Tango, Faerie Fire, Iron Branch
+Null Talisman rush: Circlet, Mantle of Intelligence, Tango, Faerie Fire (Invoker, Zeus, casters)
+Aggressive lane: Iron Branch x3, Faerie Fire, Tango (for melee/burst mids needing early stat flexibility)
+Offlane (Position 3)
+Tanky sustain: Ring of Protection, Gauntlets of Strength, Iron Branch, Tango
+Bracer rush: Circlet + Gauntlets components, Iron Branch, Tango (fast Bracer for Axe, Timbersaw)
+Boots-first: Boots of Speed, Iron Branch x3, Tango (for heroes wanting Phase Boots ASAP, e.g. Pudge offlane)
+Soft Support (Position 4)
+Standard vision: Observer Ward, Sentry Ward, Tango, Blood Grenade, Boots of Speed
+Mobility-first: Boots of Speed, Iron Branch, Tango, Blood Grenade (roamers like Spirit Breaker)
+Utility-stat: Iron Branch x2, Magic Stick, Sentry, Tango (Hoodwink, Bounty Hunter type)
+Hard Support (Position 5)
+Classic ward-and-sustain: Iron Branch x2, Magic Stick, Sentry, Tango, Blood Grenade
+Wind Lace start: Wind Lace, Tango, Clarity x2, Observer Ward (low move-speed heroes like Crystal Maiden)
+Mana-heavy: Clarity x2, Iron Branch, Sentry, Tango (heavy-spam nukers like Jakiro, Witch Doctor)

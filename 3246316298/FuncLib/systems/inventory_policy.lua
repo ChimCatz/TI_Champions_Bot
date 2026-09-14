@@ -47,25 +47,41 @@ end
 -- room left for his next item), not proactively tidying up a build that
 -- isn't actually stuck. Deliberately a narrow, explicit list rather than a
 -- general "sell whatever looks outgrown" heuristic.
+-- requireFull=true (the original Quelling Blade behavior) only sells once
+-- the inventory is genuinely full and would otherwise block the next
+-- purchase - conservative, for an item that might still have late-game
+-- utility. requireFull=false is for items with essentially zero chance of
+-- ever being useful again at their threshold (a leftover Iron Branch that
+-- never got consumed into anything, e.g. Medusa still holding one solo
+-- item_branches at 36 minutes with no combine target left) - those just
+-- get cleared out on a timer regardless of inventory space, since holding
+-- a slot hostage for a 17g item this late is never correct.
 local OBSOLETE_AFTER = {
-    item_quelling_blade = 14 * 60,
+    item_quelling_blade = { time = 14 * 60, requireFull = true },
+    item_branches = { time = 10 * 60, requireFull = false },
+    item_double_branches = { time = 10 * 60, requireFull = false },
+    -- Bottle keeps rune/regen value all game, but it's a starter-tier item
+    -- that shouldn't keep blocking a late final-item build slot (observed:
+    -- Dragon Knight still holding it at minute 38). requireFull=true so it
+    -- only goes once it's actually in the way, not proactively mid-game.
+    item_bottle = { time = 30 * 60, requireFull = true },
 }
 
--- Sells a clearly-obsolete starter item, but only once it's actually
--- blocking progress (inventory completely full). Safe to call every tick
--- from item purchase logic - throttled and a no-op the rest of the time.
+-- Sells a clearly-obsolete starter item. Safe to call every tick from item
+-- purchase logic - throttled and a no-op the rest of the time.
 function X.SellObsoleteItems(bot)
     if bot == nil or not bot:IsAlive() then return end
     local now = DotaTime()
     if now < (bot._ticbObsoleteCheckAt or -90) then return end
     bot._ticbObsoleteCheckAt = now + 5.0
 
+    local isFull = true
     for slot = 0, 8 do
-        if bot:GetItemInSlot(slot) == nil then return end
+        if bot:GetItemInSlot(slot) == nil then isFull = false break end
     end
 
-    for itemName, threshold in pairs(OBSOLETE_AFTER) do
-        if now >= threshold then
+    for itemName, rule in pairs(OBSOLETE_AFTER) do
+        if now >= rule.time and (isFull or not rule.requireFull) then
             local slot = bot:FindItemSlot(itemName)
             if slot >= 0 and slot <= 5 then
                 local item = bot:GetItemInSlot(slot)
@@ -95,9 +111,17 @@ function X.SellRedundantBoots(bot)
     if now < (bot._ticbBootsCheckAt or -90) then return end
     bot._ticbBootsCheckAt = now + 5.0
 
-    local hasTravels = bot:FindItemSlot('item_travel_boots') >= 0
+    -- Guardian Greaves and Boots of Bearing are boots-tier items in their
+    -- own right (they occupy the boot slot's role) but their recipe does
+    -- NOT consume a plain Boots of Speed, so a build that goes
+    -- boots -> Guardian Greaves/Boots of Bearing (several pos4/pos5 lists
+    -- do) ends up holding both forever - only the Travel Boots case was
+    -- covered here before.
+    local hasUpgrade = bot:FindItemSlot('item_travel_boots') >= 0
         or bot:FindItemSlot('item_travel_boots_2') >= 0
-    if not hasTravels then return end
+        or bot:FindItemSlot('item_guardian_greaves') >= 0
+        or bot:FindItemSlot('item_boots_of_bearing') >= 0
+    if not hasUpgrade then return end
 
     for _, itemName in ipairs(EARLY_BOOTS_TIERS) do
         local slot = bot:FindItemSlot(itemName)

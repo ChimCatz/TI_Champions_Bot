@@ -142,6 +142,32 @@ function X.IsCollectible(rune)
     return rune ~= nil and IsCollectible(rune)
 end
 
+-- Item 6: a whole-team log audit of a real match showed only 2 of 4 bounty
+-- spots ever got a single [TICB-RUNE] TRY entry all game - the other two
+-- were never attempted by anyone. Root cause: GetBestRune()'s
+-- IsTheClosestAlly(d,E) requires a bot to be the SINGLE globally-closest
+-- teammate to that exact rune location. Whichever hero happens to be
+-- globally closest to two or more bounty spots at once "owns" all of them
+-- for that check, but can only physically walk to the nearest one each
+-- tick - and since nobody else can ever be closER than that same hero, the
+-- other spot(s) permanently fail IsTheClosestAlly for every other
+-- teammate too, with no fallback. This gives non-closest allies a second
+-- path in: if nobody is meaningfully near a bounty rune at all, anyone can
+-- consider it, so an idle support isn't blocked out of a rune purely
+-- because a teammate several map-lengths away is nominally "closer".
+local ABANDONED_RADIUS = 2500
+function X.IsAbandoned(bot, location)
+    for index = 1, #GetTeamPlayers(GetTeam()) do
+        local ally = GetTeamMember(index)
+        if J.IsValidHero(ally) and ally:IsAlive() and not ally:IsIllusion()
+            and GetUnitToLocationDistance(ally, location) <= ABANDONED_RADIUS
+        then
+            return false
+        end
+    end
+    return true
+end
+
 local function Commit(bot, rune)
     bot._ohaRuneCommitRune = rune
     bot._ohaRuneCommitUntil = DotaTime() + CLAIM_HOLD

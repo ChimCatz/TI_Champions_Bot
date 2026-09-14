@@ -75,7 +75,7 @@ local pos=b.GetPosition and b.GetPosition(d)
 -- same "must stay near lane" window without depending on that flag.
 local coreLeashed=(pos==1 or pos==3)and DecisionPolicy.IsLaneLockActive()
 local laneFront=coreLeashed and GetLaneFrontLocation(GetTeam(),d:GetAssignedLane()or LANE_MID,0)
-for F,D in pairs(h)do local E=GetRuneSpawnLocation(D)if RunePolicy.IsCollectible(D)and a.IsTheClosestAlly(d,E)and RunePolicy.IsDesignatedCollector(d,D)and RunePolicy.IsLocallySafe(d,E)and(not coreLeashed or(laneFront-E):Length2D()<=2600)then if RunePolicy.IsBountyRune(D)or(b.IsCore(d)or not b.IsThereCoreNearby(1200))then local a0=GetUnitToLocationDistance(d,E)if a0<_ then Z=D;
+for F,D in pairs(h)do local E=GetRuneSpawnLocation(D)if RunePolicy.IsCollectible(D)and(a.IsTheClosestAlly(d,E)or RunePolicy.IsBountyRune(D)and RunePolicy.IsAbandoned(d,E))and RunePolicy.IsDesignatedCollector(d,D)and RunePolicy.IsLocallySafe(d,E)and(not coreLeashed or(laneFront-E):Length2D()<=2600)then if RunePolicy.IsBountyRune(D)or(b.IsCore(d)or not b.IsThereCoreNearby(1200))then local a0=GetUnitToLocationDistance(d,E)if a0<_ then Z=D;
 _=a0 end end end end;
 return Z,_ end;
 function a.IsTheClosestAlly(X,Q)local a1=X;

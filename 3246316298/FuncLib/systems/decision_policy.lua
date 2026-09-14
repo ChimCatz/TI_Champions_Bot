@@ -116,30 +116,16 @@ function X.ShouldForceLaneCommitment(bot)
         return true
     end
 
-    if X.IsSafeToJungleNearLane(bot) then
-        bot._ohaLaneCommitUntil = nil
-        bot._ohaWasJungleExempt = true
-        return false
-    end
-
-    if bot._ohaWasJungleExempt then
-        -- The wave-safe exception just ended - return to lane immediately,
-        -- no grace period, regardless of what the distance check below
-        -- would otherwise tolerate.
-        bot._ohaWasJungleExempt = false
-        return true
-    end
-
-    local now = DotaTime()
-    if LaneDiscipline.ShouldReturnToLane(bot) then
-        bot._ohaLaneCommitUntil = now + LANE_COMMIT_HOLD_SECONDS
-        return true
-    end
-    if bot._ohaLaneCommitUntil ~= nil and now < bot._ohaLaneCommitUntil then
-        return true
-    end
-    bot._ohaLaneCommitUntil = nil
-    return false
+    -- Per explicit design choice: while lane-locked (pos 1-3, pre-20:00, no
+    -- fallen T3), there is no jungle exception at all anymore - not even the
+    -- narrow "wave is genuinely parked near own T1, someone's holding it"
+    -- case from 0.7.3. This is the hard version of the lock; the previous
+    -- IsSafeToJungleNearLane escape hatch is intentionally not consulted
+    -- here anymore (X.IsSafeToJungleNearLane is left defined above in case
+    -- something else still wants the underlying signal).
+    bot._ohaWasJungleExempt = false
+    bot._ohaLaneCommitUntil = DotaTime() + LANE_COMMIT_HOLD_SECONDS
+    return true
 end
 
 local BASE_DEFEND_ANCIENT_RADIUS = 4000
@@ -180,6 +166,101 @@ function X.ShouldDefendBase(bot)
     end
     return X.IsThroneExposed()
         and J.Utils.CountEnemyHeroesNear(ancient:GetLocation(), BASE_EXPOSED_ANCIENT_RADIUS) >= 1
+end
+
+-- Item: a full lane of structures (a T3 tower and both barracks) fell to a
+-- completely unopposed, hero-free enemy creep wave while the whole team was
+-- elsewhere pushing/preparing to defend a different lane. ShouldDefendBase
+-- above is entirely enemy-HERO-presence-gated (no structure-HP signal at
+-- all), and the separate, much larger defend.lua threat-scoring system
+-- weights plain creep waves very lightly (0.2 each) relative to heroes/
+-- siege/special units - a genuine but "boring" unanswered wave can fall
+-- through both. This is a narrow, additive safety net: is OUR OWN structure
+-- losing health with nobody (ally or enemy hero) around to explain it, i.e.
+-- a wave is being allowed to hit it uncontested. Per explicit design
+-- choice, this should pull exactly one support, not the whole team - see
+-- X.GetStructureSiegeResponder below.
+local STRUCTURE_HP_HISTORY = {}
+local STRUCTURE_CHECK_INTERVAL = 4.0
+local UNDEFENDED_ALLY_RADIUS = 2000
+local UNDEFENDED_ENEMY_HERO_RADIUS = 2500
+
+local function GetOwnLaneStructures()
+    local team = GetTeam()
+    return {
+        { building = GetTower(team, TOWER_TOP_1), lane = LANE_TOP },
+        { building = GetTower(team, TOWER_TOP_2), lane = LANE_TOP },
+        { building = GetTower(team, TOWER_TOP_3), lane = LANE_TOP },
+        { building = GetBarracks(team, BARRACKS_TOP_MELEE), lane = LANE_TOP },
+        { building = GetBarracks(team, BARRACKS_TOP_RANGED), lane = LANE_TOP },
+        { building = GetTower(team, TOWER_MID_1), lane = LANE_MID },
+        { building = GetTower(team, TOWER_MID_2), lane = LANE_MID },
+        { building = GetTower(team, TOWER_MID_3), lane = LANE_MID },
+        { building = GetBarracks(team, BARRACKS_MID_MELEE), lane = LANE_MID },
+        { building = GetBarracks(team, BARRACKS_MID_RANGED), lane = LANE_MID },
+        { building = GetTower(team, TOWER_BOT_1), lane = LANE_BOT },
+        { building = GetTower(team, TOWER_BOT_2), lane = LANE_BOT },
+        { building = GetTower(team, TOWER_BOT_3), lane = LANE_BOT },
+        { building = GetBarracks(team, BARRACKS_BOT_MELEE), lane = LANE_BOT },
+        { building = GetBarracks(team, BARRACKS_BOT_RANGED), lane = LANE_BOT },
+    }
+end
+
+-- Returns the nearest structure that's actively losing HP (checked on a
+-- throttled timer, not every tick) with no ally hero and no enemy hero
+-- anywhere near it - i.e. a pure, unanswered creep siege - plus its lane.
+-- nil if nothing qualifies.
+function X.FindUnansweredStructureSiege()
+    local now = DotaTime()
+    local best, bestLane, bestHpFrac = nil, nil, 2.0
+    for _, entry in ipairs(GetOwnLaneStructures()) do
+        local building = entry.building
+        if building ~= nil and building:IsAlive() then
+            local id = tostring(building)
+            local hp = building:GetHealth() / math.max(1, building:GetMaxHealth())
+            local history = STRUCTURE_HP_HISTORY[id]
+            if history == nil or now >= history.checkedAt + STRUCTURE_CHECK_INTERVAL then
+                local wasDeclining = history ~= nil and hp < history.hp - 0.001
+                STRUCTURE_HP_HISTORY[id] = { hp = hp, checkedAt = now, declining = wasDeclining }
+            end
+            history = STRUCTURE_HP_HISTORY[id]
+            if history.declining and hp < bestHpFrac then
+                local loc = building:GetLocation()
+                if loc ~= nil
+                    and #(J.GetAlliesNearLoc(loc, UNDEFENDED_ALLY_RADIUS) or {}) == 0
+                    and #(J.GetEnemiesNearLoc(loc, UNDEFENDED_ENEMY_HERO_RADIUS) or {}) == 0
+                then
+                    best, bestLane, bestHpFrac = building, entry.lane, hp
+                end
+            end
+        end
+    end
+    return best, bestLane
+end
+
+-- Per explicit choice: only ONE support (pos 4/5) breaks off to clear an
+-- unanswered siege, not the whole team, and not cores. Among alive,
+-- non-illusion supports, the closest one to the endangered structure
+-- responds; everyone else's desire from this trigger stays none.
+function X.ShouldRespondToStructureSiege(bot)
+    if bot == nil or not bot:IsAlive() or bot:IsIllusion() then return false, nil end
+    local position = J.GetPosition(bot)
+    if position ~= 4 and position ~= 5 then return false, nil end
+    local building, lane = X.FindUnansweredStructureSiege()
+    if building == nil then return false, nil end
+    local myDistance = GetUnitToLocationDistance(bot, building:GetLocation())
+    for index = 1, #GetTeamPlayers(GetTeam()) do
+        local ally = GetTeamMember(index)
+        if ally ~= nil and ally ~= bot and J.IsValidHero(ally) and ally:IsAlive() and not ally:IsIllusion() then
+            local allyPosition = J.GetPosition(ally)
+            if (allyPosition == 4 or allyPosition == 5)
+                and GetUnitToLocationDistance(ally, building:GetLocation()) < myDistance
+            then
+                return false, nil
+            end
+        end
+    end
+    return true, building, lane
 end
 
 local function IsHealthyResponder(unit)

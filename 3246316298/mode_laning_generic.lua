@@ -73,7 +73,15 @@ if FarmAbilityPolicy.TryClearLaneWave(e)then return end;
 local waveClearTarget=CreepPolicy.FindSafeWaveClearTarget(e,i)if b.IsValid(waveClearTarget)then e:SetTarget(waveClearTarget)e:Action_AttackUnit(waveClearTarget,true)return end;
 if g then g.Think()return end;
 if b.IsValidBuilding(_[1])and b.CanBeAttacked(_[1])and b.IsValid(_[1]:GetAttackTarget())and _[1]:GetAttackTarget():IsCreep()then if#h>=3 then e:Action_AttackUnit(_[1],true)return end end;
-local ae=GetLaneFrontAmount(GetTeam(),l,false)local af=GetLaneFrontAmount(GetOpposingTeam(),l,false)local ag=math.max(m,250,j)local ah=GetLaneFrontLocation(GetTeam(),l,-ag)if af<ae then ah=GetLaneFrontLocation(GetOpposingTeam(),l,-ag)end;
+local ae=GetLaneFrontAmount(GetTeam(),l,false)local af=GetLaneFrontAmount(GetOpposingTeam(),l,false)-- Previously used the enemy's FULL attack range (j) as the standoff floor,
+-- which for a melee hero (m~150) facing any ranged enemy pushed the
+-- default resting distance to 3x its own reach even at the 450 cap - the
+-- hero then couldn't reach most contested last hits in time from that far
+-- back. Only a fraction of the enemy's range now counts toward the
+-- standoff (still backs off from real poke range, just not all the way to
+-- it by default), and the overall cap is tightened to keep melee heroes
+-- close enough to their own wave to actually contest it.
+local ag=math.min(math.max(m,200,j*0.5),350)local ah=GetLaneFrontLocation(GetTeam(),l,-ag)if af<ae then ah=GetLaneFrontLocation(GetOpposingTeam(),l,-ag)end;
 ah=LaneTactics.GetPreferredLaneLocation(e,l,ah)
 ah=LaneDiscipline.GetPreferredLocation(e,l,ah)
 if DotaTime()>=X then e:Action_MoveToLocation(ah)X=DotaTime()+1.0 end end;

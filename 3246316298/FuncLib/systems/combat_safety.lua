@@ -31,6 +31,24 @@ local function IsAttackThreat(unit, bot, target)
     return target ~= nil and target:IsHero() and GetUnitToUnitDistance(unit, bot) <= 650
 end
 
+-- Hero-owned summons (Warlock's Golem, Enigma's Eidolons, Lone Druid's
+-- Bear) and dominated neutrals (Helm of the Dominator/Overlord) hit like a
+-- hero-tier unit but are neutral-team, so bot:GetNearbyLaneCreeps() never
+-- returns them - the escape/commit math below was blind to them entirely,
+-- which is why bots kept forced-attacking a Golem instead of retreating
+-- from it (it "isn't a threat" as far as this evaluation was concerned).
+local DANGEROUS_SUMMON_NAME = {
+    npc_dota_warlock_golem = true,
+    npc_dota_unit_enigma_eidolon = true,
+    npc_dota_lone_druid_bear = true,
+}
+local function IsDangerousSummon(unit)
+    local name = unit:GetUnitName()
+    if DANGEROUS_SUMMON_NAME[name] then return true end
+    return unit:HasModifier('modifier_helm_of_the_dominator_dominated')
+        or unit:HasModifier('modifier_helm_of_the_overlord_dominated')
+end
+
 function X.Evaluate(bot, target, seconds)
     seconds = seconds or 3.5
     local heroDamage = 0
@@ -51,6 +69,13 @@ function X.Evaluate(bot, target, seconds)
         if J.IsValid(creep) and IsAttackThreat(creep, bot, target) then
             local weight = creep:GetAttackTarget() == bot and 1.0 or 0.55
             creepDamage = creepDamage + AttackDamageOverTime(creep, bot, seconds) * weight
+        end
+    end
+
+    for _, summon in pairs(bot:GetNearbyCreeps(900, true) or {}) do
+        if J.IsValid(summon) and IsDangerousSummon(summon) and IsAttackThreat(summon, bot, target) then
+            local weight = summon:GetAttackTarget() == bot and 1.0 or 0.55
+            heroDamage = heroDamage + AttackDamageOverTime(summon, bot, seconds) * weight
         end
     end
 
