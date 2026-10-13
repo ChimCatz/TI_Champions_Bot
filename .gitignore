@@ -14,3 +14,15 @@ backups/
 # Deployment mirrors of 3246316298/ (kept byte-identical via sync, not source of truth)
 OpenHyperAI-Enhanced/
 TI-Champions-Bot/
+
+# Internal dev notes / session logs - not for public repo (local paths, raw debugging diary)
+CLAUDE_CODE_HANDOFF.md
+patch-notes-for-development.txt
+build-order-dota-2.md
+
+# One-off local debug/analysis artifacts
+match_*.png
+
+# Raw banner source (full-res); the repo keeps docs/banner.webp
+ti-champions-bot.jfif
+ti-champions-bot.webp
