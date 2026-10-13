@@ -253,7 +253,7 @@ end
 
 local function IsCombatCommitValid(bot, state)
     if not IsValidEnemy(state.target) or DotaTime() >= state.untilTime then return false end
-    if J.GetHP(bot) < (state.kind == 'KILL' and 0.34 or 0.48) then return false end
+    if J.GetHP(bot) < (state.kind == 'KILL' and 0.34 or 0.40) then return false end
     if J.IsRetreating(bot) or bot:WasRecentlyDamagedByTower(1.5) then return false end
     if (state.kind == 'HARASS' or state.kind == 'PRESSURE') and CountCreepsAttacking(bot) >= 3 then return false end
     local evaluation = EvaluateTarget(bot, state.target)
@@ -265,7 +265,7 @@ local function IsCombatCommitValid(bot, state)
     then
         return false
     end
-    if evaluation.closeAllies == 0 and evaluation.killRatio < 1.15 then return false end
+    if evaluation.closeAllies == 0 and evaluation.killRatio < 1.0 then return false end
     return GetUnitToUnitDistance(bot, state.target) <= 1400
 end
 

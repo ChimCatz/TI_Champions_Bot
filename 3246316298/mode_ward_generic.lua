@@ -10,6 +10,7 @@ function GetDesire()if ShouldSkipBotThink(GetBot())then return 0 end;
 if c.GetPosition(b)<=3 then return BOT_MODE_DESIRE_NONE end;
 local l=GetDesireHelper()return RemapValClamped(c.GetHP(b)*l,0,1,BOT_MODE_DESIRE_NONE,l)end;
 function GetDesireHelper()if not a.IsSuitableToWard()then return BOT_MODE_DESIRE_NONE end;
+if c.IsInLaningPhase()then local wardEnemyNear=c.GetNearbyHeroes(b,900,true,BOT_MODE_NONE)if wardEnemyNear~=nil and#wardEnemyNear>=1 then return BOT_MODE_DESIRE_NONE end end;
 if c.Utils.IsTeamPushingSecondTierOrHighGround(b)then return BOT_MODE_DESIRE_NONE end;
 local m=c.Utils.CountEnemyHeroesNear(GetAncient(GetTeam()):GetLocation(),3200)if m>=1 then return BOT_MODE_DESIRE_NONE end;
 local n=c.Utils.CountEnemyHeroesOnHighGround(GetTeam())>=2;

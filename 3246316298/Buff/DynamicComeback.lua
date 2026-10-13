@@ -50,17 +50,27 @@ local TIMER_INTERVAL = 60
 -- actual gold/XP income. BASE_* is a small always-on trickle (present even
 -- at zero gap); MAX_EXTRA_* is added on top, scaled 0..1 by that hero's own
 -- comeback fraction, fully scaled at NETWORTH_SATURATION_GAP.
-local BASE_GOLD_PER_MIN = 40
-local MAX_EXTRA_GOLD_PER_MIN = 260
-local BASE_XP_PER_MIN = 25
-local MAX_EXTRA_XP_PER_MIN = 175
+--
+-- Cut roughly in half from the original flat-rate rewrite (40/260/25/175)
+-- after live reports of DK/Naga hitting level ~30 by minute 20 and other
+-- heroes level-jumping - see the big comment above TickTeam and
+-- HARD_CAP_GOLD_PER_MIN/HARD_CAP_XP_PER_MIN below for the belt-and-braces
+-- per-tick clamp that now backs this up independent of the formula.
+local BASE_GOLD_PER_MIN = 20
+local MAX_EXTRA_GOLD_PER_MIN = 130
+local BASE_XP_PER_MIN = 12
+local MAX_EXTRA_XP_PER_MIN = 88
+
+-- Belt-and-braces per-tick clamp: applied AFTER the formula above, so even
+-- if BASE_*/MAX_EXTRA_* are misconfigured or a future edit changes the
+-- formula, no single 60s grant can ever exceed this regardless of frac.
+local HARD_CAP_GOLD_PER_MIN = BASE_GOLD_PER_MIN + MAX_EXTRA_GOLD_PER_MIN
+local HARD_CAP_XP_PER_MIN = BASE_XP_PER_MIN + MAX_EXTRA_XP_PER_MIN
 
 -- Safety net: even if every calculation above is somehow wrong, no hero can
 -- ever receive more than this much total bonus gold/XP across a whole game.
--- At the max per-minute rate (300g / 200xp) these caps aren't reachable
--- until roughly minute 100, so they only ever matter if something breaks.
-local HARD_CAP_TOTAL_GOLD = 18000
-local HARD_CAP_TOTAL_XP = 12000
+local HARD_CAP_TOTAL_GOLD = 9000
+local HARD_CAP_TOTAL_XP = 6000
 
 local lastTimerTick = {}
 local totalGoldBonus = {}
@@ -161,6 +171,7 @@ function DynamicComeback:TickTeam(team)
 
                 local goldBefore = PlayerResource:GetGold(pid)
                 local goldBonus = math.floor(BASE_GOLD_PER_MIN + frac * MAX_EXTRA_GOLD_PER_MIN)
+                if goldBonus > HARD_CAP_GOLD_PER_MIN then goldBonus = HARD_CAP_GOLD_PER_MIN end
                 local remainingGoldCap = HARD_CAP_TOTAL_GOLD - (totalGoldBonus[pid] or 0)
                 if goldBonus > remainingGoldCap then goldBonus = remainingGoldCap end
                 if goldBonus > 0 then
@@ -176,6 +187,7 @@ function DynamicComeback:TickTeam(team)
                     local ok, xp = pcall(function() return hero:GetCurrentXP() end)
                     if ok and xp ~= nil then xpBefore = xp end
                     xpBonus = math.floor(BASE_XP_PER_MIN + frac * MAX_EXTRA_XP_PER_MIN)
+                    if xpBonus > HARD_CAP_XP_PER_MIN then xpBonus = HARD_CAP_XP_PER_MIN end
                     local remainingXpCap = HARD_CAP_TOTAL_XP - (totalXpBonus[pid] or 0)
                     if xpBonus > remainingXpCap then xpBonus = remainingXpCap end
                     if xpBonus > 0 then

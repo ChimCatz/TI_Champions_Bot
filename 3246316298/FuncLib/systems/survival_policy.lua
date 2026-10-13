@@ -86,7 +86,7 @@ function X.GetRetreatDesire(bot)
     if recentlyHit and (remaining < 0.22 or hp < 0.34) then
         return BOT_MODE_DESIRE_ABSOLUTE
     end
-    if recentlyHit and ((not isLaning and #enemies > #allies + 1) or remaining < 0.38 or hp < 0.50) then
+    if recentlyHit and ((not isLaning and #enemies > #allies + 1) or remaining < 0.30 or hp < 0.40) then
         return BOT_MODE_DESIRE_VERYHIGH + 0.08
     end
     if recentlyHit and hp < 0.62 and not isLaning and #enemies > #allies then

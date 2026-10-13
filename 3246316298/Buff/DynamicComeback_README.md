@@ -1,11 +1,13 @@
 Dynamic gold/XP comeback system for bots. Once per real 60 seconds, grants
 every bot a FLAT gold/XP bonus (not a multiplier on their actual earnings):
-a small always-on baseline (40g / 25xp per minute) plus up to another
-260g / 175xp per minute, scaled 0..1 by how far THAT SPECIFIC HERO is
+a small always-on baseline (20g / 12xp per minute) plus up to another
+130g / 88xp per minute, scaled 0..1 by how far THAT SPECIFIC HERO is
 behind the enemy team's average net worth (fully scaled at a 10,000 gold
-gap). Bots only - human players are never touched. Hard per-hero, per-game
-caps (18,000 total bonus gold / 12,000 total bonus XP) apply on top of all
-of this as a safety net.
+gap). Bots only - human players are never touched. Every per-minute grant
+is also clamped to a hard per-tick ceiling (the same 150g / 100xp max)
+independent of the formula above, so a future formula change can't
+silently exceed it. Hard per-hero, per-game caps (9,000 total bonus gold /
+6,000 total bonus XP) apply on top of all of this as a safety net.
 
 The scale is per-hero, not per-team: each bot's own net worth is compared
 against the enemy team's average, so a struggling hero gets boosted more

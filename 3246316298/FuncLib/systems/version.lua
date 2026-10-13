@@ -1,1 +1,1 @@
-local a={}a.number="0.6.0 - TI Champions build - 2026/09/02"a.recentChangeLogs={"Strict runes, coordinated punishment, active lanes"}return a
+local a={}a.number="0.7.9 - TI Champions build - 2026/10/13"a.recentChangeLogs={"Hero-pick variety rebalance, Sand King/Treant ultimate combo fixes, ward-pathing lane-pull fix, bot passivity/aggression tuning"}return a

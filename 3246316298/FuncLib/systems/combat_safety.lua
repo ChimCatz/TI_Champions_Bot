@@ -156,7 +156,7 @@ function X.CanCommit(bot, target, killRatio)
         if killRatio < 1.35 or forecast.predictedRatio < 0.38 then return false end
     end
     if forecast.creepDamage > bot:GetHealth() * 0.28 and killRatio < 1.15 then return false end
-    return forecast.riskRatio <= (killRatio >= 1.2 and 0.82 or 0.62)
+    return forecast.riskRatio <= (killRatio >= 1.2 and 0.82 or 0.70)
 end
 
 function X.ShouldEscape(bot, target)
